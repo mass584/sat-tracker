@@ -512,6 +512,12 @@ function latAtPx(y) { return 90 + panLat - ((y - H / 2) / scale + H / 2) * 180 /
 function maxPanLat() { return 90 * (1 - 1 / scale); }
 function clampPanLat() { panLat = clamp(panLat, -maxPanLat(), maxPanLat()); }
 
+// 等倍のときはスマホの1本指縦ドラッグをページスクロールに譲り、
+// 拡大したら地図側で受け取って縦パンできるようにする
+function syncCanvasTouchAction() {
+  canvas.style.touchAction = scale > 1 ? 'none' : 'pan-y';
+}
+
 // 画面上の (cx, cy) に写る経緯度を固定したまま、そこを中心に factor 倍する
 function zoomAt(cx, cy, factor) {
   const newScale = clamp(scale * factor, MIN_SCALE, MAX_SCALE);
@@ -523,6 +529,7 @@ function zoomAt(cx, cy, factor) {
   const py1Target = (cy - H / 2) / scale + H / 2;
   panLat = py1Target * 180 / H - 90 + lat0;
   clampPanLat();
+  syncCanvasTouchAction();
 }
 
 // 経度の折り返しを解消した配列にする（描画時に ±360 ずらして3回描く）
@@ -1297,8 +1304,10 @@ function bindControls() {
     drag.lastX = e.clientX; drag.lastY = e.clientY;
     drag.moved += Math.abs(dx) + Math.abs(dy);
     panLon = (panLon + dx / r.width * 360 / scale) % 360;
-    // スマホの縦ドラッグはページスクロールに使うので、地図の縦パンはマウス・ペンだけで行う
-    if (e.pointerType !== 'touch') {
+    // 等倍のときのスマホ1本指ドラッグはページスクロールに譲る
+    // （touch-actionで既に地図側は縦を奪っていないので、実際にはここは主にマウス・ペン用）。
+    // 拡大後はtouch-action: noneに切り替えているので、スマホでも縦パンできる
+    if (e.pointerType !== 'touch' || scale > 1) {
       panLat += dy / r.height * 180 / scale;
       clampPanLat();
     }
@@ -1353,6 +1362,7 @@ function bindControls() {
     panLon = DEFAULT_PAN_LON;
     panLat = 0;
     scale = 1;
+    syncCanvasTouchAction();
     $('btnMapReset').hidden = true;
     render();
   });

@@ -87,6 +87,8 @@ body {
   overflow: hidden;
   background: #05070f;
 }
+/* 等倍のときは1本指の縦ドラッグをページスクロールに譲るためpan-y。
+   拡大中はJS側（syncCanvasTouchAction）でnoneに切り替え、地図の縦パンに使う */
 #map { display: block; width: 100%; cursor: crosshair; touch-action: pan-y; }
 #map.dragging { cursor: grabbing; }
 .map-reset {
