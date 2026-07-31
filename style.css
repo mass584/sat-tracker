@@ -267,6 +267,8 @@ input[type="number"] { width: 100%; }
 @media (pointer: coarse) {
   .sel, .sel-sm, .sat-select,
   input[type="number"], input[type="datetime-local"] { font-size: 16px; }
+  /* 都市選択（.sel-sm）が上のルールで16pxになるので、隣の「現在地を使う」ボタンも揃える */
+  #btnGeo { font-size: 16px; }
 }
 
 /* ---------- サイドカード ---------- */
@@ -642,11 +644,9 @@ body.ar-open { overflow: hidden; }
   .map-hint { display: none; }
   .map-geo { display: flex; }
 
-  /* 細かい時刻操作は既定で隠し、トグルで開く */
-  .time-more-toggle { display: block; }
+  /* 細かい時刻操作は縦幅がもったいないので出さない（スマホでは無くてOK） */
+  .time-more-toggle { display: none; }
   .time-more { display: none; }
-  .time-more.open { display: flex; }
-  .dt-label { margin-left: 0; }
 
   /* LIVE・早送り・倍率は日時と同じ行の右側へ。幅を稼ぐため文字は出さない */
   .time-head { flex-wrap: nowrap; gap: 8px; }
@@ -656,10 +656,13 @@ body.ar-open { overflow: hidden; }
   .time-actions .btn-icon { font-size: 15px; }
 
   /* 時刻表示は主役ではないので、狭い画面では小さめにする */
-  .clock-main { font-size: 17px; }
+  .clock-main { font-size: 15px; }
   .timebar { padding: 12px 14px; }
   .slider-cap { font-size: 10px; }
   .offset-label { font-size: 11px; }
+
+  /* この時刻の値はラベルと値を横並びにして省スペースにする */
+  .stats > div { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
 }
 
 /* ---------- PC幅：画面内に収め、結果はカード内でスクロールさせる ---------- */
