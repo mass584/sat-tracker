@@ -1,7 +1,7 @@
 'use strict';
 /*
- * 保存したタイミング（クリップ）
- *  - 「次に見えるタイミングを探す」の「☆ 保存」で localStorage に保存し、ARビューの対象にする
+ * 保存した観測チャンス（クリップ）
+ *  - 「次の観測チャンスを探す」の「☆ 保存」で localStorage に保存し、ARビューの対象にする
  *  - 終わったものは既定で隠し、チェックで一覧の末尾に出す
  */
 
@@ -323,7 +323,7 @@ function renderClips() {
   if (!list.length) {
     box.innerHTML = past.length
       ? '<p class="empty">これから見えるタイミングの保存はありません。過去の記録は下のチェックで表示できます。</p>'
-      : '<p class="empty">「次に見えるタイミングを探す」の「☆ 保存」で追加すると、ARビューで探せるようになります。</p>';
+      : '<p class="empty">「次の観測チャンスを探す」の「☆ 保存」で追加すると、ARビューで探せるようになります。</p>';
     return;
   }
 
@@ -396,7 +396,7 @@ function renderClipBadge() {
     badge.textContent = String(n);
     btn.appendChild(badge);
   }
-  btn.title = n ? `保存したタイミング（${n}件）` : '保存したタイミング';
+  btn.title = n ? `保存した観測チャンス（${n}件）` : '保存した観測チャンス';
 }
 
 function updateClipEtas() {

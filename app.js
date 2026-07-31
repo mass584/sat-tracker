@@ -479,15 +479,51 @@ function resizeCanvas() {
   canvas.height = Math.round(cssH * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   W = cssW; H = cssH;
+  clampPanLat();
 }
 
 // 画面中央に来る経度は -panLon。既定は日本付近（東経140度）を中心にする
 const DEFAULT_PAN_LON = -140;
 let panLon = DEFAULT_PAN_LON;         // 地図の横スクロール量（度）。経度は周期的なので剰余で扱う
-const px = (lon) => (lon + 180 + panLon) / 360 * W;
-const py = (lat) => (90 - lat) / 180 * H;
-// 点で置くもの（マーカーやラベル）は画面内へ折り返す
-const pxw = (lon) => { const x = px(lon) % W; return x < 0 ? x + W : x; };
+let panLat = 0;                       // 地図の縦スクロール量（度、画面中央の緯度）。拡大時のみ意味を持つ
+const MIN_SCALE = 1, MAX_SCALE = 8;
+let scale = 1;                        // 地図の拡大率。1が世界全体表示
+
+// 等倍（scale=1）時の投影。scale込みの px/py はこれを画面中心基準に拡縮する
+const px1 = (lon) => (lon + 180 + panLon) / 360 * W;
+const py1 = (lat) => (90 - lat + panLat) / 180 * H;
+const px = (lon) => (px1(lon) - W / 2) * scale + W / 2;
+const py = (lat) => (py1(lat) - H / 2) * scale + H / 2;
+// 点で置くもの（マーカーやラベル）は、画面中央に一番近い経度の写し（±360度違い）を選ぶ。
+// 拡大時は世界全体が画面に収まらないため、単純な剰余での折り返しは使えない
+const pxw = (lon) => {
+  const centerLon = -panLon;
+  let l = lon;
+  while (l - centerLon > 180) l -= 360;
+  while (l - centerLon < -180) l += 360;
+  return px(l);
+};
+
+// 画面座標（キャンバス内のCSSピクセル）から経度・緯度を逆算する
+function lonAtPx(x) { return ((x - W / 2) / scale + W / 2) * 360 / W - 180 - panLon; }
+function latAtPx(y) { return 90 + panLat - ((y - H / 2) / scale + H / 2) * 180 / H; }
+
+// 拡大時、緯度方向に極を越えて空白が見えないようpanLatを許容範囲へ収める
+function maxPanLat() { return 90 * (1 - 1 / scale); }
+function clampPanLat() { panLat = clamp(panLat, -maxPanLat(), maxPanLat()); }
+
+// 画面上の (cx, cy) に写る経緯度を固定したまま、そこを中心に factor 倍する
+function zoomAt(cx, cy, factor) {
+  const newScale = clamp(scale * factor, MIN_SCALE, MAX_SCALE);
+  if (newScale === scale) return;
+  const lon0 = lonAtPx(cx), lat0 = latAtPx(cy);
+  scale = newScale;
+  const px1Target = (cx - W / 2) / scale + W / 2;
+  panLon = px1Target * 360 / W - 180 - lon0;
+  const py1Target = (cy - H / 2) / scale + H / 2;
+  panLat = py1Target * 180 / H - 90 + lat0;
+  clampPanLat();
+}
 
 // 経度の折り返しを解消した配列にする（描画時に ±360 ずらして3回描く）
 function unwrap(points) {
@@ -1199,52 +1235,124 @@ function bindControls() {
     if (isFinite(ms)) setBase(ms);
   });
 
-  // 地図：ドラッグで横スクロール（経度は周期的なので端で折り返す）、
+  // 地図：ドラッグでスクロール（拡大時は縦にも動く）、ホイールやピンチで拡大縮小、
   // 動かさずに離したときだけ観測地点の設定として扱う
-  let drag = null;
+  let drag = null;                      // 1本指ドラッグ中の状態
+  const pinchPointers = new Map();      // 2本指ピンチ中に追跡するポインタのクライアント座標
+  let pinchDist = null;                 // 直前フレームでの2本指の距離（px）
+
   const lonAt = (clientX) => {
     const r = canvas.getBoundingClientRect();
-    return normLonDeg((clientX - r.left) / r.width * 360 - 180 - panLon);
+    return normLonDeg(lonAtPx(clientX - r.left));
+  };
+  const latAt = (clientY) => {
+    const r = canvas.getBoundingClientRect();
+    return clamp(latAtPx(clientY - r.top), -90, 90);
   };
 
-  // 2本指以降は無視する。マルチタッチで横スクロールが暴れたり、
+  function updateMapResetVisibility() {
+    const atDefault = Math.abs(panLon - DEFAULT_PAN_LON) < 0.5 && scale === 1 && Math.abs(panLat) < 0.5;
+    $('btnMapReset').hidden = atDefault;
+  }
+
+  function pinchGeometry() {
+    const pts = [...pinchPointers.values()];
+    const r = canvas.getBoundingClientRect();
+    return {
+      dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+      mid: { x: (pts[0].x + pts[1].x) / 2 - r.left, y: (pts[0].y + pts[1].y) / 2 - r.top },
+    };
+  }
+
+  // 3本目以降は無視する。マルチタッチで表示が暴れたり、
   // 指を離した拍子に観測地点が設定されたりするのを防ぐ
   canvas.addEventListener('pointerdown', (e) => {
-    if (!e.isPrimary) { drag = null; canvas.classList.remove('dragging'); return; }
-    drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, lastX: e.clientX, moved: 0 };
-    canvas.setPointerCapture(e.pointerId);
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    if (pinchPointers.size >= 2) return;
+    pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinchPointers.size === 2) {
+      drag = null;                      // 1本指ドラッグ中でも2本目が触れたらピンチへ切り替える
+      pinchDist = pinchGeometry().dist;
+      canvas.classList.add('dragging');
+    } else {
+      drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, lastX: e.clientX, lastY: e.clientY, moved: 0 };
+    }
   });
 
   canvas.addEventListener('pointermove', (e) => {
+    if (pinchPointers.has(e.pointerId)) pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pinchPointers.size >= 2) {
+      const { dist, mid } = pinchGeometry();
+      if (pinchDist > 0) zoomAt(mid.x, mid.y, dist / pinchDist);
+      pinchDist = dist;
+      updateMapResetVisibility();
+      render();
+      return;
+    }
+
     if (!drag || e.pointerId !== drag.id) return;
     const r = canvas.getBoundingClientRect();
-    const dx = e.clientX - drag.lastX;
-    drag.lastX = e.clientX;
-    drag.moved += Math.abs(dx);
-    panLon = (panLon + dx / r.width * 360) % 360;
+    const dx = e.clientX - drag.lastX, dy = e.clientY - drag.lastY;
+    drag.lastX = e.clientX; drag.lastY = e.clientY;
+    drag.moved += Math.abs(dx) + Math.abs(dy);
+    panLon = (panLon + dx / r.width * 360 / scale) % 360;
+    // スマホの縦ドラッグはページスクロールに使うので、地図の縦パンはマウス・ペンだけで行う
+    if (e.pointerType !== 'touch') {
+      panLat += dy / r.height * 180 / scale;
+      clampPanLat();
+    }
     canvas.classList.add('dragging');
-    $('btnMapReset').hidden = Math.abs(panLon - DEFAULT_PAN_LON) < 0.5;
+    updateMapResetVisibility();
     render();
   });
 
   canvas.addEventListener('pointerup', (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
+    pinchPointers.delete(e.pointerId);
+    if (pinchPointers.size < 2) pinchDist = null;
+
+    if (!drag || e.pointerId !== drag.id) {
+      if (pinchPointers.size === 0) canvas.classList.remove('dragging');
+      return;
+    }
     const wasDrag = drag.moved > 4;
     drag = null;
     canvas.classList.remove('dragging');
     if (wasDrag) return;
-    const r = canvas.getBoundingClientRect();
-    setObserver({
-      lat: 90 - (e.clientY - r.top) / r.height * 180,
-      lon: lonAt(e.clientX),
-      label: '選択地点', kind: 'map',
-    });
+    setObserver({ lat: latAt(e.clientY), lon: lonAt(e.clientX), label: '選択地点', kind: 'map' });
   });
 
-  canvas.addEventListener('pointercancel', () => { drag = null; canvas.classList.remove('dragging'); });
+  canvas.addEventListener('pointercancel', (e) => {
+    pinchPointers.delete(e.pointerId);
+    if (pinchPointers.size < 2) pinchDist = null;
+    drag = null;
+    canvas.classList.remove('dragging');
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    zoomAt(e.clientX - r.left, e.clientY - r.top, factor);
+    updateMapResetVisibility();
+    render();
+  }, { passive: false });
+
+  $('btnZoomIn').addEventListener('click', () => {
+    zoomAt(W / 2, H / 2, 1.5);
+    updateMapResetVisibility();
+    render();
+  });
+  $('btnZoomOut').addEventListener('click', () => {
+    zoomAt(W / 2, H / 2, 1 / 1.5);
+    updateMapResetVisibility();
+    render();
+  });
 
   $('btnMapReset').addEventListener('click', () => {
     panLon = DEFAULT_PAN_LON;
+    panLat = 0;
+    scale = 1;
     $('btnMapReset').hidden = true;
     render();
   });

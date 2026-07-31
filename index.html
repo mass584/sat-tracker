@@ -20,7 +20,7 @@
   </h1>
   <select id="satSelect" class="sel sat-select" title="追跡する衛星"></select>
   <div class="topbar-actions">
-    <button id="btnClips" class="icon-btn" title="保存したタイミング" aria-label="保存したタイミング">☆</button>
+    <button id="btnClips" class="icon-btn" title="保存した観測チャンス" aria-label="保存した観測チャンス">☆</button>
     <button id="btnInfo" class="icon-btn" title="技術情報" aria-label="技術情報">i</button>
   </div>
 </header>
@@ -33,6 +33,10 @@
       <canvas id="map"></canvas>
       <div id="mapHint" class="map-hint">クリックで観測地点を設定・ドラッグで横にスクロール</div>
       <button id="btnMapReset" class="map-reset" hidden>表示位置を戻す</button>
+      <div class="map-zoom">
+        <button id="btnZoomIn" class="map-zoom-btn" title="地図を拡大" aria-label="地図を拡大">+</button>
+        <button id="btnZoomOut" class="map-zoom-btn" title="地図を縮小" aria-label="地図を縮小">−</button>
+      </div>
       <button id="btnMapGeo" class="map-geo" title="現在地に観測地点を置く" aria-label="現在地に観測地点を置く">📍</button>
     </div>
 
@@ -99,7 +103,7 @@
     </div>
 
     <div class="card card-search">
-      <h2>次に見えるタイミングを探す</h2>
+      <h2>次の観測チャンスを探す</h2>
       <div class="card-search-body">
 
         <div class="obs-form">
@@ -148,9 +152,9 @@
   </aside>
 </main>
 
-<!-- ============ 保存したタイミング ============ -->
+<!-- ============ 保存した観測チャンス ============ -->
 <dialog id="clipsDialog" class="info-dialog">
-  <h2>保存したタイミング</h2>
+  <h2>保存した観測チャンス</h2>
   <div id="clipList" class="clip-list"></div>
   <label id="showPastRow" class="chk clips-past" hidden>
     <input id="showPastClips" type="checkbox">過去の記録も表示
@@ -165,7 +169,7 @@
 <!-- ============ どのカレンダーを使うか（初回に一度だけ聞く） ============ -->
 <dialog id="calDialog" class="info-dialog cal-dialog">
   <h2>どのカレンダーに追加しますか</h2>
-  <p class="note">最初の一回だけ選びます。あとから「保存したタイミング」の下で変更できます。</p>
+  <p class="note">最初の一回だけ選びます。あとから「保存した観測チャンス」の下で変更できます。</p>
   <div class="cal-choices">
     <button class="btn cal-choice" data-cal-pref="google" type="button">
       <span class="cal-choice-name">Google カレンダー</span>
