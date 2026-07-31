@@ -56,6 +56,7 @@ node --check app.js && node --check clips.js && node --check ar.js
 | `sat-observer-v1` | 観測地点 |
 | `sat-clips-v1` | 保存したタイミング |
 | `sat-calendar-v1` | 追加先のカレンダー（`google` / `apple`。未設定なら初回に選ばせる） |
+| `sat-guide-seen-v1` | 肉眼観測の条件ダイアログを見たか（初回のみ自動表示。以降は🎓アイコンから） |
 
 保存データの構造を変えるときはキーのバージョンを上げるか、**古い形を読めるフォールバックを
 必ず用意してください**（利用者のデータを黙って壊さないこと）。

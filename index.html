@@ -21,6 +21,7 @@
   <select id="satSelect" class="sel sat-select" title="追跡する衛星"></select>
   <div class="topbar-actions">
     <button id="btnClips" class="icon-btn" title="保存した観測チャンス" aria-label="保存した観測チャンス">☆</button>
+    <button id="btnGuide" class="icon-btn" title="肉眼観測の条件" aria-label="肉眼観測の条件">🎓</button>
     <button id="btnInfo" class="icon-btn" title="技術情報" aria-label="技術情報">i</button>
   </div>
 </header>
@@ -181,6 +182,16 @@
     </button>
   </div>
   <form method="dialog"><button class="btn">やめる</button></form>
+</dialog>
+
+<!-- ============ 肉眼観測の条件（初回に一度だけ自動で開く） ============ -->
+<dialog id="guideDialog" class="info-dialog guide-dialog">
+  <h2>肉眼観測の条件</h2>
+  <img class="guide-img" src="guide-conditions.jpg" alt="ISS（国際宇宙ステーション）肉眼観測の条件：1. ISSに太陽光が当たっていること　2. 観測地が暗いこと　3. 天候が良いこと　4. 頭上近くを通過すること">
+  <p class="note">ISSは自分で光っているのではなく、太陽光を反射して見えています。地上は暗く、ISSには日が当たっている——そんな条件がそろう薄明の時間帯だけ、肉眼で見つけられます。
+    Sat Trackerは、指定した観測地点でこの条件がそろう次のタイミングを自動で計算します。
+    見つけたタイミングは保存しておけて、当日はカメラをかざすAR表示で実際の空から探せます。</p>
+  <form method="dialog"><button class="btn">閉じる</button></form>
 </dialog>
 
 <!-- ============ 技術情報ダイアログ ============ -->
