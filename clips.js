@@ -294,6 +294,99 @@ function openIcs(c) {
 }
 
 // ============================================================
+// 天気予報（Open-Meteo）
+// ============================================================
+/*
+ * 保存した記録の座標・時刻から雲量を取り出して表示する。
+ * これは観測地点の座標を外部（Open-Meteo）へ送る唯一の機能なので、
+ * localStorageなどには持ち回さず一覧を開くたびに取り直す（送信先はREADME参照）。
+ */
+const WEATHER_FORECAST_MAX_DAYS = 16;   // Open-Meteo無料予報の上限。これより先は予報自体が無い
+const WEATHER_CACHE_MS = 15 * 60000;    // 同じ地点に短時間で何度も投げないための保持時間
+
+const weatherCache = new Map();   // key: "lat,lon"(丸め) -> { ts, hours: Map<hourMs, {cloud, code}> }
+
+function weatherKey(lat, lon) { return `${lat.toFixed(2)},${lon.toFixed(2)}`; }
+
+async function fetchWeatherSeries(lat, lon) {
+  const key = weatherKey(lat, lon);
+  const cached = weatherCache.get(key);
+  if (cached && Date.now() - cached.ts < WEATHER_CACHE_MS) return cached.hours;
+
+  const q = new URLSearchParams({
+    latitude: lat.toFixed(2),
+    longitude: lon.toFixed(2),
+    hourly: 'cloudcover,weathercode',
+    forecast_days: String(WEATHER_FORECAST_MAX_DAYS),
+    timezone: 'UTC',
+  });
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`);
+  if (!res.ok) throw new Error(`weather ${res.status}`);
+  const data = await res.json();
+
+  const hours = new Map();
+  const times = data.hourly?.time || [];
+  const clouds = data.hourly?.cloudcover || [];
+  const codes = data.hourly?.weathercode || [];
+  // timezone=UTCで取っているので、末尾にZを補えばそのままDate.parseできる
+  times.forEach((t, i) => hours.set(Date.parse(`${t}Z`), { cloud: clouds[i], code: codes[i] }));
+
+  weatherCache.set(key, { ts: Date.now(), hours });
+  return hours;
+}
+
+// WMO天気コードを表示用の絵文字に簡略化する
+function weatherIcon(code) {
+  if (code === 0) return '☀️';
+  if (code <= 3) return '⛅';
+  if (code === 45 || code === 48) return '🌫';
+  if (code >= 51 && code <= 67) return '🌧';
+  if (code >= 71 && code <= 77) return '🌨';
+  if (code >= 80 && code <= 82) return '🌦';
+  if (code >= 85 && code <= 86) return '🌨';
+  if (code >= 95) return '⛈';
+  return '☁️';
+}
+
+function weatherLabel(hourData) {
+  if (!hourData || hourData.cloud === null || hourData.cloud === undefined) return '';
+  return `${weatherIcon(hourData.code)} 雲量${Math.round(hourData.cloud)}%`;
+}
+
+// 観測開始時刻に最も近い1時間ぶんの予報を拾う（通過は数分なので時間単位で十分）
+function lookupWeather(hours, startMs) {
+  return hours.get(Math.round(startMs / 3600000) * 3600000);
+}
+
+// 一覧を描画したあとに非同期で埋める。座標を丸めて地点ごとにまとめ、
+// 同じ地点への重複リクエストを避ける
+async function loadClipWeather(list) {
+  const targets = list.filter((c) => !isPastClip(c) &&
+    clipStartMs(c) <= Date.now() + WEATHER_FORECAST_MAX_DAYS * 86400000);
+  if (!targets.length) return;
+
+  const byKey = new Map();
+  targets.forEach((c) => {
+    const key = weatherKey(c.obs.lat, c.obs.lon);
+    if (!byKey.has(key)) byKey.set(key, { lat: c.obs.lat, lon: c.obs.lon, clips: [] });
+    byKey.get(key).clips.push(c);
+  });
+
+  await Promise.all([...byKey.values()].map(async ({ lat, lon, clips: group }) => {
+    let hours;
+    try { hours = await fetchWeatherSeries(lat, lon); }
+    catch (_) { return; }   // 天気は付加情報なので、取得に失敗しても一覧自体は出す
+
+    group.forEach((c) => {
+      const label = weatherLabel(lookupWeather(hours, clipStartMs(c)));
+      if (!label) return;
+      const el = document.querySelector(`[data-weather="${c.id}"]`);
+      if (el) { el.textContent = label; el.hidden = false; }
+    });
+  }));
+}
+
+// ============================================================
 // 表示
 // ============================================================
 function renderClips() {
@@ -345,6 +438,8 @@ function renderClips() {
         · ${compass(c.riseAz)} から ${compass(c.setAz)} へ
       </div>
       ${tag}
+      ${!done && start <= Date.now() + WEATHER_FORECAST_MAX_DAYS * 86400000
+        ? `<div class="clip-weather" data-weather="${c.id}" hidden></div>` : ''}
       <div class="clip-actions">
         ${done ? '' : `<button class="btn btn-sm btn-ar" data-ar="${c.id}">📷 ARで探す</button>
         <button class="btn btn-sm btn-cal" data-cal="${c.id}">📅 カレンダーに追加</button>`}
@@ -382,6 +477,7 @@ function renderClips() {
     }));
 
   updateClipEtas();
+  loadClipWeather(list);   // 非同期。取得でき次第プレースホルダーを埋める
 }
 
 // ヘッダーのアイコンに保存件数を出す
