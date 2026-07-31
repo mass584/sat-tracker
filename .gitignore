@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# エディタ
+.vscode/
+.idea/
+*.swp
+
+# ローカル専用の設定・秘密情報（この名前のファイルは絶対にコミットしない）
+*.local
+*.local.*
+.env
+.env.*
+secrets.*
+config.local.json
+
+# 実行時に生成されるもの
+*.log

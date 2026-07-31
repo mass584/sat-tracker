@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sat Tracker — 肉眼で見える人工衛星を探す</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#080b14">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Sat Tracker <span class="sub">肉眼で見える人工衛星を探す</span></h1>
+  <select id="satSelect" class="sel sat-select" title="追跡する衛星"></select>
+  <div class="topbar-actions">
+    <button id="btnClips" class="icon-btn" title="保存したタイミング" aria-label="保存したタイミング">☆</button>
+    <button id="btnInfo" class="icon-btn" title="技術情報" aria-label="技術情報">i</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ============ 左：地図 + 時刻コントロール ============ -->
+  <section class="map-pane">
+    <div class="map-wrap">
+      <canvas id="map"></canvas>
+      <div id="mapHint" class="map-hint">クリックで観測地点を設定・ドラッグで横にスクロール</div>
+      <button id="btnMapReset" class="map-reset" hidden>表示位置を戻す</button>
+    </div>
+
+    <div class="timebar">
+      <div class="time-head">
+        <div class="clock">
+          <div id="clockLocal" class="clock-main">--:--:--</div>
+        </div>
+        <div class="time-actions">
+          <button id="btnLive" class="btn btn-live is-on">● LIVE</button>
+          <button id="btnPlay" class="btn">▶ 再生</button>
+          <select id="speed" class="sel" title="再生速度">
+            <option value="1">×1</option>
+            <option value="10">×10</option>
+            <option value="60" selected>×60</option>
+            <option value="300">×300</option>
+            <option value="1800">×1800</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="slider-row">
+        <span class="slider-cap">−12時間</span>
+        <input id="timeSlider" type="range" min="-720" max="720" value="0" step="1">
+        <span class="slider-cap">+12時間</span>
+      </div>
+      <div id="offsetLabel" class="offset-label">基準時刻ちょうど</div>
+
+      <div class="jump-row">
+        <button class="btn btn-sm" data-jump="-1440">−1日</button>
+        <button class="btn btn-sm" data-jump="-60">−1時間</button>
+        <button class="btn btn-sm" data-jump="-10">−10分</button>
+        <button class="btn btn-sm btn-now" data-jump="now">今</button>
+        <button class="btn btn-sm" data-jump="10">+10分</button>
+        <button class="btn btn-sm" data-jump="60">+1時間</button>
+        <button class="btn btn-sm" data-jump="1440">+1日</button>
+        <label class="dt-label">基準日時
+          <input id="baseTime" type="datetime-local" step="1">
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 右：ステータス + パス予報 ============ -->
+  <aside class="side">
+
+    <div class="card">
+      <h2>この時刻の<span id="satNameCard">ISS</span></h2>
+      <dl class="stats">
+        <div><dt>緯度</dt><dd id="sLat">–</dd></div>
+        <div><dt>経度</dt><dd id="sLon">–</dd></div>
+        <div><dt>高度</dt><dd id="sAlt">–</dd></div>
+        <div><dt>速度</dt><dd id="sVel">–</dd></div>
+        <div><dt>直下点</dt><dd id="sPlace">–</dd></div>
+        <div><dt>日照</dt><dd id="sSun">–</dd></div>
+      </dl>
+      <div id="obsRel" class="obs-rel"></div>
+    </div>
+
+    <div class="card">
+      <h2>次に見えるタイミングを探す</h2>
+
+      <div class="obs-form">
+        <div class="field-row">
+          <button id="btnGeo" class="btn btn-sm">📍 現在地を使う</button>
+          <select id="preset" class="sel sel-sm">
+            <option value="">主要都市から選ぶ…</option>
+          </select>
+        </div>
+        <div class="obs-display">
+          <span id="obsCoords" class="obs-coords">観測地点が未設定です</span>
+          <span class="obs-hint">地図をクリックしても設定できます</span>
+        </div>
+        <div class="field-row">
+          <label class="tight">空の条件
+            <select id="skyLimit" class="sel sel-sm" title="肉眼で見える限界等級">
+              <option value="city">市街地</option>
+              <option value="suburb" selected>郊外</option>
+              <option value="dark">暗い空</option>
+            </select>
+          </label>
+          <label class="tight">最低仰角
+            <select id="minEl" class="sel sel-sm">
+              <option value="5">5°</option>
+              <option value="10" selected>10°</option>
+              <option value="20">20°</option>
+              <option value="30">30°</option>
+            </select>
+          </label>
+          <label class="tight">検索期間
+            <select id="days" class="sel sel-sm">
+              <option value="3">3日</option>
+              <option value="7">7日</option>
+              <option value="14" selected>14日</option>
+            </select>
+          </label>
+          <label class="chk"><input id="onlyVisible" type="checkbox" checked>肉眼で見えるものだけ</label>
+        </div>
+        <button id="btnPredict" class="btn btn-primary">計算する</button>
+      </div>
+
+      <div id="passResult" class="pass-result"></div>
+    </div>
+
+  </aside>
+</main>
+
+<!-- ============ 保存したタイミング ============ -->
+<dialog id="clipsDialog" class="info-dialog">
+  <h2>保存したタイミング</h2>
+  <div id="clipList" class="clip-list"></div>
+  <label id="showPastRow" class="chk clips-past" hidden>
+    <input id="showPastClips" type="checkbox">過去の記録も表示
+  </label>
+  <form method="dialog"><button class="btn">閉じる</button></form>
+</dialog>
+
+<!-- ============ 技術情報ダイアログ ============ -->
+<dialog id="infoDialog" class="info-dialog">
+  <h2>技術情報</h2>
+  <dl id="infoBody" class="info-body"></dl>
+  <p class="note">軌道要素は CelesTrak の「visual」群（肉眼で見える明るさの人工天体 約157個）から取得し、
+    そのうち標準等級の分かっている8件を追跡対象にしています。
+    位置はすべて最新TLEを SGP4 で伝播して計算しています。ISS選択時のみ wheretheiss.at と
+    自動照合し、上の「実測との照合」に差を表示します。TLEの元期から離れるほど誤差が増えます
+    （数日で数十km程度）。</p>
+  <p class="note">明るさは <code>標準等級 − 15.75 + 2.5·log10(距離² / 位相関数)</code> に大気減光
+    （0.28等/大気路程）を加えて求めています。標準等級は観測者コミュニティで使われている概算値で、
+    確度が高いのはISSくらいです。姿勢による見かけの変化（太陽電池パネルの向きやフレア）は考慮していません。</p>
+  <form method="dialog"><button class="btn">閉じる</button></form>
+</dialog>
+
+<!-- ============ ARビュー（全画面オーバーレイ） ============ -->
+<div id="arOverlay" class="ar-overlay" hidden>
+  <video id="arVideo" playsinline muted autoplay></video>
+  <canvas id="arCanvas"></canvas>
+  <div class="ar-top">
+    <div id="arTitle" class="ar-title">—</div>
+    <button id="arClose" class="btn btn-sm">✕ 閉じる</button>
+  </div>
+  <div class="ar-bottom">
+    <div id="arInfo" class="ar-info">—</div>
+    <p id="arWarn" class="ar-warn"></p>
+    <div class="ar-actions">
+      <button id="arCalib" class="btn btn-sm">北を合わせる</button>
+      <button id="arCalibReset" class="btn btn-sm" hidden>補正リセット</button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/satellite.min.js"></script>
+<script src="world-land.js"></script>
+<script src="app.js"></script>
+<script src="clips.js"></script>
+<script src="ar.js"></script>
+</body>
+</html>
