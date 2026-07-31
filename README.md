@@ -142,6 +142,7 @@ ISS選択時のみ wheretheiss.at と30秒ごとに自動照合し、差をⓘ�
 | 世界地図 | Natural Earth 110m land（パブリックドメイン、`world-land.js` に同梱） |
 | SGP4実装 | satellite.js v5.0.0（MIT、`vendor/` に同梱） |
 | 保存した記録の雲量 | `https://api.open-meteo.com/v1/forecast`（APIキー不要、一覧を開いたときのみ） |
+| アクセス解析 | Cloudflare Web Analytics（`static.cloudflareinsights.com`、Cookie不使用） |
 
 ネットワークが使えない場合は `app.js` の `FALLBACK_TLE`（ISSのみ）にフォールバックします。
 
@@ -152,6 +153,11 @@ ISS選択時のみ wheretheiss.at と30秒ごとに自動照合し、差をⓘ�
   Google カレンダーへ渡ります（観測地点は含めていません）
 - 保存した記録の一覧を開いたとき。**その記録の座標（＝観測地点そのもの）**を Open-Meteo へ
   送って雲量を取得します。localStorage には残さず、一覧を開くたびに取り直します
+
+このほか、全ページに Cloudflare Web Analytics のビーコンを設置しています。
+閲覧のたびに URL・リファラー・ブラウザ種別・（IPアドレスから推定した）国が Cloudflare へ送られますが、
+Cookie・localStorage は使わず個々の閲覧者を識別しない集計目的のみです。
+観測地点や保存したタイミング（localStorage のデータ）はここには含まれません。
 
 ## ファイル構成
 
