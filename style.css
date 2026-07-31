@@ -156,7 +156,7 @@ body {
 .time-actions .btn,
 .time-actions .sel { height: 32px; padding-top: 0; padding-bottom: 0; display: flex; align-items: center; }
 .time-actions .btn { gap: 5px; }
-.btn-icon { font-size: 11px; line-height: 1; }
+.btn-icon { font-size: 12px; line-height: 1; }
 
 .slider-row {
   display: flex;
@@ -232,7 +232,7 @@ body {
   letter-spacing: .05em;
   font-size: 12px;
 }
-.btn-live .btn-icon { font-size: 9px; }
+.btn-live .btn-icon { font-size: 12px; }
 .btn-live.is-on {
   color: #041018;
   background: var(--accent);
@@ -619,8 +619,7 @@ body.ar-open { overflow: hidden; }
   .time-actions { margin-left: auto; gap: 6px; }
   .time-actions .btn-label { display: none; }
   .time-actions .btn { padding: 0 10px; }
-  .time-actions .btn-icon { font-size: 13px; }
-  .btn-live .btn-icon { font-size: 11px; }
+  .time-actions .btn-icon { font-size: 15px; }
 
   /* 時刻表示は主役ではないので、狭い画面では小さめにする */
   .clock-main { font-size: 17px; }

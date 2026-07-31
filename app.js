@@ -1122,7 +1122,7 @@ function renderObserver() {
 // （スマホではラベルを隠してアイコンだけにするため）
 function setPlayButton(playing) {
   const b = $('btnPlay');
-  b.querySelector('.btn-icon').textContent = playing ? '⏸' : '▶';
+  b.querySelector('.btn-icon').textContent = playing ? '⏸' : '⏩';
   b.querySelector('.btn-label').textContent = playing ? '停止' : '早送り';
   b.title = playing ? '停止' : '早送り';
 }

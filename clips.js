@@ -143,7 +143,9 @@ function renderClips() {
       const named = isNamedPlace(c.obs);
       setObserver({ lat: c.obs.lat, lon: c.obs.lon,
                     label: named ? c.obs.label : '', kind: named ? 'preset' : 'map' });
+      // 反映先の地図を見せるため、閉じたうえで先頭まで戻す
       $('clipsDialog').close();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }));
   box.querySelectorAll('[data-ar]').forEach((b) =>
     b.addEventListener('click', () => {
