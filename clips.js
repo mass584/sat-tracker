@@ -110,10 +110,11 @@ function renderClips() {
   box.innerHTML = `<ul class="clip-items">${list.map((c) => {
     const start = clipStartMs(c), end = clipEndMs(c);
     const done = isPastClip(c);
+    const ms = magStyles(c.mag);
     const tag = c.visible
-      ? `<span class="pass-tag vis">肉眼可${c.mag !== null && c.mag !== undefined ? ' ' + fmtMag(c.mag) : ''}</span>`
+      ? `<span class="pass-tag vis" style="${ms.tag}">${c.mag !== null && c.mag !== undefined ? fmtMag(c.mag) : '肉眼可'}</span>`
       : '<span class="pass-tag">肉眼では見えない条件</span>';
-    return `<li class="clip ${c.visible ? 'vis' : ''} ${done ? 'done' : ''}">
+    return `<li class="clip ${c.visible ? 'vis' : ''} ${done ? 'done' : ''}"${c.visible ? ` style="${ms.card}"` : ''}>
       <div class="clip-head">
         <span class="clip-sat">${satNameByCatnr(c.catnr, c.sat)}</span>
         <span class="clip-eta" data-eta="${Math.round(start)}">–</span>
@@ -142,7 +143,9 @@ function renderClips() {
       const named = isNamedPlace(c.obs);
       setObserver({ lat: c.obs.lat, lon: c.obs.lon,
                     label: named ? c.obs.label : '', kind: named ? 'preset' : 'map' });
+      // 反映先の地図を見せるため、閉じたうえで先頭まで戻す
       $('clipsDialog').close();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }));
   box.querySelectorAll('[data-ar]').forEach((b) =>
     b.addEventListener('click', () => {

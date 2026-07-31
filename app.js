@@ -201,6 +201,38 @@ function apparentMagnitude(catnr, st, obsGd, elDeg, rangeKm) {
 
 const fmtMag = (m) => `${m <= 0 ? '−' : ''}${Math.abs(m).toFixed(1)}等`;
 
+// 等級から色を作る。透明度だけでは差が出ないので、色相・彩度・明度も動かす。
+// 明るいものは白に近い黄、暗くなるほど彩度を落として沈ませる。
+const MAG_STOPS = [
+  { m: -2.0, h: 50, s: 100, l: 80 },   // −2等：ほぼ白い黄
+  { m:  0.0, h: 40, s: 100, l: 66 },   //  0等：明るいオレンジ
+  { m:  2.0, h: 30, s:  75, l: 52 },   //  2等：くすんだ橙
+  { m:  3.5, h: 24, s:  40, l: 44 },   //  3.5等：茶色寄り
+  { m:  5.0, h: 20, s:  14, l: 38 },   //  5等：ほぼ無彩色
+];
+
+function magHsl(m, alpha) {
+  if (m === null || m === undefined) return `hsla(30, 35%, 52%, ${alpha})`;
+  const v = clamp(m, MAG_STOPS[0].m, MAG_STOPS[MAG_STOPS.length - 1].m);
+  let a = MAG_STOPS[0], b = MAG_STOPS[1];
+  for (let i = 0; i < MAG_STOPS.length - 1; i++) {
+    if (v >= MAG_STOPS[i].m && v <= MAG_STOPS[i + 1].m) { a = MAG_STOPS[i]; b = MAG_STOPS[i + 1]; break; }
+  }
+  const t = (v - a.m) / (b.m - a.m);
+  const mix = (p, q) => Math.round(p + (q - p) * t);
+  return `hsla(${mix(a.h, b.h)}, ${mix(a.s, b.s)}%, ${mix(a.l, b.l)}%, ${alpha})`;
+}
+
+// 可視カードの見た目。明るいものほど縦線を太く、光っているように見せる
+function magStyles(m) {
+  const bright = m !== null && m !== undefined && m <= 0.5;
+  return {
+    card: `border-left-color:${magHsl(m, 1)};border-left-width:${bright ? 5 : 3}px` +
+          (bright ? `;box-shadow:inset 3px 0 12px -4px ${magHsl(m, .85)}` : ''),
+    tag: `color:${magHsl(m, 1)};border-color:${magHsl(m, .55)};background:${magHsl(m, .14)}`,
+  };
+}
+
 // ============================================================
 // 軌道要素（TLE）
 // ============================================================
@@ -292,9 +324,15 @@ function renderTleStatus() {
     ? `${Math.round(Math.abs(ageDays) * 24)}時間前`
     : `${Math.abs(ageDays).toFixed(1)}日前`;
 
+  const ref = refCheckRow();
+
+  // 元期が古い、または実測とのずれが大きいときだけアイコンを警告色にする
   const icon = $('btnInfo');
-  icon.classList.toggle('err', stale);
-  icon.title = stale ? `技術情報（TLEの元期が${age}と古くなっています）` : '技術情報';
+  const warn = stale || !!(ref && ref.err);
+  icon.classList.toggle('err', warn);
+  icon.title = stale ? `技術情報（TLEの元期が${age}と古くなっています）`
+             : (ref && ref.err) ? `技術情報（実測とのずれが大きくなっています）`
+             : '技術情報';
 
   const rows = [
     ['追跡対象', current ? `${satLabel(current)}（NORAD ${current.catnr}）` : '–'],
@@ -303,7 +341,6 @@ function renderTleStatus() {
     ['周回周期', `${orbitPeriodMin().toFixed(1)} 分`],
     ['伝播モデル', 'SGP4 / satellite.js v5'],
   ];
-  const ref = refCheckRow();
   if (ref) rows.push(['実測との照合', `<span class="${ref.err ? 'err' : 'ok'}">${ref.text}</span>`]);
   $('infoBody').innerHTML = rows.map(([k, v]) =>
     `<div><dt>${k}</dt><dd class="${k === '元期' && stale ? 'err' : ''}">${v}</dd></div>`).join('');
@@ -444,7 +481,9 @@ function resizeCanvas() {
   W = cssW; H = cssH;
 }
 
-let panLon = 0;                       // 地図の横スクロール量（度）。経度は周期的なので剰余で扱う
+// 画面中央に来る経度は -panLon。既定は日本付近（東経140度）を中心にする
+const DEFAULT_PAN_LON = -140;
+let panLon = DEFAULT_PAN_LON;         // 地図の横スクロール量（度）。経度は周期的なので剰余で扱う
 const px = (lon) => (lon + 180 + panLon) / 360 * W;
 const py = (lat) => (90 - lat) / 180 * H;
 // 点で置くもの（マーカーやラベル）は画面内へ折り返す
@@ -599,8 +638,8 @@ function drawLabel(x, y, text, color, font, offX, offY) {
 }
 
 // 地図上の緯度経度に、背景から浮くようにラベルを置く
-function drawMapLabel(lat, lon, text, color, align) {
-  const x = pxw(normLonDeg(lon)), y = py(lat);
+function drawMapLabel(lat, lon, text, color, align, dy) {
+  const x = pxw(normLonDeg(lon)), y = py(lat) + (dy || 0);
   ctx.save();
   ctx.font = '600 10.5px -apple-system, sans-serif';
   ctx.shadowColor = 'rgba(4,8,20,.95)';
@@ -679,10 +718,11 @@ function drawMap(st) {
   drawFootprint(st.lat, st.lon, st.alt);
 
   // 凡例を置く代わりに、地図上の要素へ直接ラベルを添える
-  if (past.length) drawMapLabel(past[0].lat, past[0].lon, '過去の軌跡', 'rgba(140,175,220,.95)');
+  // 極軌道では軌跡の両端が近づくので、上下にずらして重ならないようにする
+  if (past.length) drawMapLabel(past[0].lat, past[0].lon, '過去の軌跡', 'rgba(140,175,220,.95)', null, 16);
   if (future.length) {
     const f = future[future.length - 1];
-    drawMapLabel(f.lat, f.lon, '未来の軌跡', 'rgba(77,208,255,.95)');
+    drawMapLabel(f.lat, f.lon, '未来の軌跡', 'rgba(77,208,255,.95)', null, -8);
   }
   const footEdge = Math.acos(EARTH_R / (EARTH_R + st.alt)) * R2D;
   drawMapLabel(clamp(st.lat - footEdge, -88, 88), st.lon, '可視円', 'rgba(77,208,255,.75)', 'center');
@@ -728,26 +768,6 @@ function renderStatus(st) {
   const groundSun = sunElevationDeg(st.lat, st.lon, sub);
   $('sSun').textContent = sunlit ? '☀ 日照中' : '🌑 地球の影';
   $('sSun').title = `直下点の太陽高度 ${groundSun.toFixed(1)}°`;
-
-  const box = $('obsRel');
-  if (state.observer) {
-    const la = lookAngles(state.observer, st);
-    const obsSun = sunElevationDeg(state.observer.lat, state.observer.lon, sub);
-    if (la.el >= 0) {
-      const visible = sunlit && obsSun < -6;
-      const obsGd = { longitude: state.observer.lon * D2R, latitude: state.observer.lat * D2R, height: 0 };
-      const mag = apparentMagnitude(current && current.catnr, st, obsGd, la.el, la.range);
-      box.innerHTML = `観測地点から <b>仰角 ${la.el.toFixed(1)}°</b> / ${compass(la.az)}（方位 ${la.az.toFixed(0)}°）` +
-                      ` · 距離 <b>${Math.round(la.range).toLocaleString('ja-JP')} km</b>` +
-                      (mag !== null ? ` · 明るさ <b>${fmtMag(mag)}</b>` : '') + '<br>' +
-                      (visible ? '<b style="color:#ffb454">この時刻は肉眼で見える条件です</b>'
-                               : `地平線上ですが${sunlit ? '空が明るい' : '衛星が影の中'}ため肉眼では見えません`);
-    } else {
-      box.innerHTML = '';        // 地平線の下にいる間は何も出さない
-    }
-  } else {
-    box.innerHTML = '';
-  }
 }
 
 function renderClock(d) {
@@ -942,13 +962,17 @@ function renderPasses(passes, obs, opts, keepCount) {
     const from = p.visible ? p.visStart : p.riseMs;
     const to = p.visible ? p.visEnd : p.setMs;
     const eta = p.riseMs > now ? `約${fmtDuration(p.riseMs - now)}後` : '通過中';
+    // 明るいものほど縦線を太く濃くする
+    const ms = magStyles(p.mag);
+    const edge = p.visible ? ` style="${ms.card}"` : '';
     const visTag = p.visible
-      ? `<span class="pass-tag vis">肉眼可${p.mag !== null && p.mag !== undefined ? ' ' + fmtMag(p.mag) : ''}</span>`
+      ? `<span class="pass-tag vis" style="${ms.tag}">` +
+        `${p.mag !== null && p.mag !== undefined ? fmtMag(p.mag) : '肉眼可'}</span>`
       : `<span class="pass-tag">${p.reason}</span>`;
-    return `<li class="pass ${p.visible ? 'vis' : ''} ${i === 0 ? 'next' : ''}">
+    return `<li class="pass ${p.visible ? 'vis' : ''} ${i === 0 ? 'next' : ''}" data-rise="${Math.round(p.riseMs)}"${edge}>
       <div class="pass-when">
         <span class="pass-date">${fmtDay(new Date(from))} ${fmtHM(new Date(from))}–${fmtHM(new Date(to))}</span>
-        <span class="pass-eta">${eta}</span>
+        <span class="pass-eta" data-pass-eta="${Math.round(p.riseMs)}">${eta}</span>
       </div>
       <div class="pass-meta">
         最大仰角 <b>${p.maxEl.toFixed(1)}°</b>（${compass(p.maxAz)}）<br>
@@ -980,7 +1004,10 @@ function renderPasses(passes, obs, opts, keepCount) {
   }
 
   box.querySelectorAll('[data-goto]').forEach((btn) => {
-    btn.addEventListener('click', () => setBase(parseInt(btn.dataset.goto, 10)));
+    btn.addEventListener('click', () => {
+      setBase(parseInt(btn.dataset.goto, 10));
+      revealMap();
+    });
   });
   box.querySelectorAll('[data-clip]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -991,6 +1018,32 @@ function renderPasses(passes, obs, opts, keepCount) {
     });
   });
   syncClipButtons();
+}
+
+// 通過が迫ったカードを強調する。開いたままでも表示が古くならないよう毎秒見直す
+const SOON_MS = 60 * 60000;                 // 1時間前から「まもなく」扱い
+function updatePassEtas() {
+  const now = Date.now();
+  document.querySelectorAll('.pass[data-rise]').forEach((li) => {
+    const rise = parseInt(li.dataset.rise, 10);
+    const eta = li.querySelector('[data-pass-eta]');
+    if (eta) eta.textContent = rise > now ? `約${fmtDuration(rise - now)}後` : '通過中';
+    const soon = rise - now < SOON_MS;
+    li.classList.toggle('soon', soon);
+    if (eta) eta.classList.toggle('soon', soon);
+  });
+}
+
+// 地図が画面にほとんど入っていなければスクロールして見せる。
+// 幅の狭い端末では地図と計算結果が縦に並ぶため、時刻を移動しても変化が見えないことへの対策
+function revealMap() {
+  const el = document.querySelector('.map-wrap');
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const shown = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+  if (shown < Math.min(r.height, window.innerHeight) * 0.6) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 // 保存ボタンから参照するため、直近に描画したパスを保持する
@@ -1065,6 +1118,15 @@ function renderObserver() {
 // ============================================================
 // 時刻コントロール
 // ============================================================
+// 早送りボタンの表示。アイコンとラベルを別要素にしているのでまとめて更新する
+// （スマホではラベルを隠してアイコンだけにするため）
+function setPlayButton(playing) {
+  const b = $('btnPlay');
+  b.querySelector('.btn-icon').textContent = playing ? '⏸' : '⏩';
+  b.querySelector('.btn-label').textContent = playing ? '停止' : '早送り';
+  b.title = playing ? '停止' : '早送り';
+}
+
 function setLive(on) {
   state.live = on;
   if (on) {
@@ -1073,7 +1135,7 @@ function setLive(on) {
     $('timeSlider').value = 0;
   }
   $('btnLive').classList.toggle('is-on', on);
-  $('btnPlay').textContent = state.playing ? '⏸ 停止' : '▶ 再生';
+  setPlayButton(state.playing);
 }
 
 function setBase(ms) {
@@ -1082,7 +1144,7 @@ function setBase(ms) {
   state.baseMs = ms;
   state.offsetMin = 0;
   $('timeSlider').value = 0;
-  $('btnPlay').textContent = '▶ 再生';
+  setPlayButton(false);
   syncBaseInput(true);
   render();
 }
@@ -1102,7 +1164,7 @@ function bindControls() {
   $('btnPlay').addEventListener('click', () => {
     state.playing = !state.playing;
     if (state.playing) { state.live = false; $('btnLive').classList.remove('is-on'); }
-    $('btnPlay').textContent = state.playing ? '⏸ 停止' : '▶ 再生';
+    setPlayButton(state.playing);
   });
 
   $('speed').addEventListener('change', (e) => { state.speed = parseFloat(e.target.value); });
@@ -1151,7 +1213,7 @@ function bindControls() {
     drag.moved += Math.abs(dx);
     panLon = (panLon + dx / r.width * 360) % 360;
     canvas.classList.add('dragging');
-    $('btnMapReset').hidden = Math.abs(panLon) < 0.5;
+    $('btnMapReset').hidden = Math.abs(panLon - DEFAULT_PAN_LON) < 0.5;
     render();
   });
 
@@ -1172,7 +1234,7 @@ function bindControls() {
   canvas.addEventListener('pointercancel', () => { drag = null; canvas.classList.remove('dragging'); });
 
   $('btnMapReset').addEventListener('click', () => {
-    panLon = 0;
+    panLon = DEFAULT_PAN_LON;
     $('btnMapReset').hidden = true;
     render();
   });
@@ -1190,24 +1252,36 @@ function bindControls() {
     e.target.value = '';
   });
 
-  $('btnGeo').addEventListener('click', () => {
+  const useCurrentLocation = (btn, label) => {
     if (!navigator.geolocation) {
-      $('passResult').innerHTML = '<p class="empty">このブラウザは位置情報に対応していません。緯度・経度を直接入力してください。</p>';
+      $('passResult').innerHTML = '<p class="empty">このブラウザは位置情報に対応していません。都市を選ぶか、地図をクリックして指定してください。</p>';
       return;
     }
-    $('btnGeo').textContent = '取得中…';
+    const original = btn.textContent;
+    btn.textContent = '…';
+    btn.disabled = true;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        $('btnGeo').textContent = '📍 現在地を使う';
+        btn.textContent = original;
+        btn.disabled = false;
         setObserver({ lat: pos.coords.latitude, lon: pos.coords.longitude, label: '現在地', kind: 'geo' });
       },
       (err) => {
-        $('btnGeo').textContent = '📍 現在地を使う';
+        btn.textContent = original;
+        btn.disabled = false;
         $('passResult').innerHTML = `<p class="empty">現在地を取得できませんでした（${err.message}）。` +
-          `位置情報は https もしくは localhost で開いた場合のみ利用できます。緯度・経度の直接入力や地図クリックでも指定できます。</p>`;
+          `位置情報は https もしくは localhost でのみ利用できます。都市の選択や地図クリックでも指定できます。</p>`;
       },
       { enableHighAccuracy: false, timeout: 10000 }
     );
+  };
+  $('btnGeo').addEventListener('click', (e) => useCurrentLocation(e.currentTarget));
+  $('btnMapGeo').addEventListener('click', (e) => useCurrentLocation(e.currentTarget));
+
+  $('btnTimeMore').addEventListener('click', (e) => {
+    const open = $('timeMore').classList.toggle('open');
+    e.currentTarget.setAttribute('aria-expanded', String(open));
+    e.currentTarget.textContent = open ? '− 細かい時刻操作' : '＋ 細かい時刻操作';
   });
 
   $('btnPredict').addEventListener('click', runPrediction);
@@ -1274,6 +1348,7 @@ async function init() {
 
   pollReference();
   setInterval(pollReference, 30000);
+  setInterval(updatePassEtas, 1000);
   setInterval(renderTleStatus, 60000);
   requestAnimationFrame(loop);
 }
