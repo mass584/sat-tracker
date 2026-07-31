@@ -201,10 +201,37 @@ function apparentMagnitude(catnr, st, obsGd, elDeg, rangeKm) {
 
 const fmtMag = (m) => `${m <= 0 ? '−' : ''}${Math.abs(m).toFixed(1)}等`;
 
-// 等級を 0〜1 の「濃さ」に変換する。−2等で1.0、5等で0.0
-const magStrength = (m) => (m === null || m === undefined) ? 0.55 : clamp((5 - m) / 7, 0, 1);
-// 濃さから、可視パスを示すオレンジ系の色を作る
-const magColor = (m, base) => `rgba(255, 180, 84, ${(base + (1 - base) * magStrength(m)).toFixed(3)})`;
+// 等級から色を作る。透明度だけでは差が出ないので、色相・彩度・明度も動かす。
+// 明るいものは白に近い黄、暗くなるほど彩度を落として沈ませる。
+const MAG_STOPS = [
+  { m: -2.0, h: 50, s: 100, l: 80 },   // −2等：ほぼ白い黄
+  { m:  0.0, h: 40, s: 100, l: 66 },   //  0等：明るいオレンジ
+  { m:  2.0, h: 30, s:  75, l: 52 },   //  2等：くすんだ橙
+  { m:  3.5, h: 24, s:  40, l: 44 },   //  3.5等：茶色寄り
+  { m:  5.0, h: 20, s:  14, l: 38 },   //  5等：ほぼ無彩色
+];
+
+function magHsl(m, alpha) {
+  if (m === null || m === undefined) return `hsla(30, 35%, 52%, ${alpha})`;
+  const v = clamp(m, MAG_STOPS[0].m, MAG_STOPS[MAG_STOPS.length - 1].m);
+  let a = MAG_STOPS[0], b = MAG_STOPS[1];
+  for (let i = 0; i < MAG_STOPS.length - 1; i++) {
+    if (v >= MAG_STOPS[i].m && v <= MAG_STOPS[i + 1].m) { a = MAG_STOPS[i]; b = MAG_STOPS[i + 1]; break; }
+  }
+  const t = (v - a.m) / (b.m - a.m);
+  const mix = (p, q) => Math.round(p + (q - p) * t);
+  return `hsla(${mix(a.h, b.h)}, ${mix(a.s, b.s)}%, ${mix(a.l, b.l)}%, ${alpha})`;
+}
+
+// 可視カードの見た目。明るいものほど縦線を太く、光っているように見せる
+function magStyles(m) {
+  const bright = m !== null && m !== undefined && m <= 0.5;
+  return {
+    card: `border-left-color:${magHsl(m, 1)};border-left-width:${bright ? 5 : 3}px` +
+          (bright ? `;box-shadow:inset 3px 0 12px -4px ${magHsl(m, .85)}` : ''),
+    tag: `color:${magHsl(m, 1)};border-color:${magHsl(m, .55)};background:${magHsl(m, .14)}`,
+  };
+}
 
 // ============================================================
 // 軌道要素（TLE）
@@ -297,9 +324,15 @@ function renderTleStatus() {
     ? `${Math.round(Math.abs(ageDays) * 24)}時間前`
     : `${Math.abs(ageDays).toFixed(1)}日前`;
 
+  const ref = refCheckRow();
+
+  // 元期が古い、または実測とのずれが大きいときだけアイコンを警告色にする
   const icon = $('btnInfo');
-  icon.classList.toggle('err', stale);
-  icon.title = stale ? `技術情報（TLEの元期が${age}と古くなっています）` : '技術情報';
+  const warn = stale || !!(ref && ref.err);
+  icon.classList.toggle('err', warn);
+  icon.title = stale ? `技術情報（TLEの元期が${age}と古くなっています）`
+             : (ref && ref.err) ? `技術情報（実測とのずれが大きくなっています）`
+             : '技術情報';
 
   const rows = [
     ['追跡対象', current ? `${satLabel(current)}（NORAD ${current.catnr}）` : '–'],
@@ -308,7 +341,6 @@ function renderTleStatus() {
     ['周回周期', `${orbitPeriodMin().toFixed(1)} 分`],
     ['伝播モデル', 'SGP4 / satellite.js v5'],
   ];
-  const ref = refCheckRow();
   if (ref) rows.push(['実測との照合', `<span class="${ref.err ? 'err' : 'ok'}">${ref.text}</span>`]);
   $('infoBody').innerHTML = rows.map(([k, v]) =>
     `<div><dt>${k}</dt><dd class="${k === '元期' && stale ? 'err' : ''}">${v}</dd></div>`).join('');
@@ -736,26 +768,6 @@ function renderStatus(st) {
   const groundSun = sunElevationDeg(st.lat, st.lon, sub);
   $('sSun').textContent = sunlit ? '☀ 日照中' : '🌑 地球の影';
   $('sSun').title = `直下点の太陽高度 ${groundSun.toFixed(1)}°`;
-
-  const box = $('obsRel');
-  if (state.observer) {
-    const la = lookAngles(state.observer, st);
-    const obsSun = sunElevationDeg(state.observer.lat, state.observer.lon, sub);
-    if (la.el >= 0) {
-      const visible = sunlit && obsSun < -6;
-      const obsGd = { longitude: state.observer.lon * D2R, latitude: state.observer.lat * D2R, height: 0 };
-      const mag = apparentMagnitude(current && current.catnr, st, obsGd, la.el, la.range);
-      box.innerHTML = `観測地点から <b>仰角 ${la.el.toFixed(1)}°</b> / ${compass(la.az)}（方位 ${la.az.toFixed(0)}°）` +
-                      ` · 距離 <b>${Math.round(la.range).toLocaleString('ja-JP')} km</b>` +
-                      (mag !== null ? ` · 明るさ <b>${fmtMag(mag)}</b>` : '') + '<br>' +
-                      (visible ? '<b style="color:#ffb454">この時刻は肉眼で見える条件です</b>'
-                               : `地平線上ですが${sunlit ? '空が明るい' : '衛星が影の中'}ため肉眼では見えません`);
-    } else {
-      box.innerHTML = '';        // 地平線の下にいる間は何も出さない
-    }
-  } else {
-    box.innerHTML = '';
-  }
 }
 
 function renderClock(d) {
@@ -950,13 +962,13 @@ function renderPasses(passes, obs, opts, keepCount) {
     const from = p.visible ? p.visStart : p.riseMs;
     const to = p.visible ? p.visEnd : p.setMs;
     const eta = p.riseMs > now ? `約${fmtDuration(p.riseMs - now)}後` : '通過中';
+    // 明るいものほど縦線を太く濃くする
+    const ms = magStyles(p.mag);
+    const edge = p.visible ? ` style="${ms.card}"` : '';
     const visTag = p.visible
-      ? `<span class="pass-tag vis" style="border-color:${magColor(p.mag, 0.3)};` +
-        `background:${magColor(p.mag, 0.08).replace('rgba(255, 180, 84', 'rgba(120, 78, 20')}">` +
-        `肉眼可${p.mag !== null && p.mag !== undefined ? ' ' + fmtMag(p.mag) : ''}</span>`
+      ? `<span class="pass-tag vis" style="${ms.tag}">` +
+        `${p.mag !== null && p.mag !== undefined ? fmtMag(p.mag) : '肉眼可'}</span>`
       : `<span class="pass-tag">${p.reason}</span>`;
-    // 明るいものほど左の縦線とタグを濃くする
-    const edge = p.visible ? ` style="border-left-color:${magColor(p.mag, 0.25)}"` : '';
     return `<li class="pass ${p.visible ? 'vis' : ''} ${i === 0 ? 'next' : ''}" data-rise="${Math.round(p.riseMs)}"${edge}>
       <div class="pass-when">
         <span class="pass-date">${fmtDay(new Date(from))} ${fmtHM(new Date(from))}–${fmtHM(new Date(to))}</span>
@@ -1106,6 +1118,15 @@ function renderObserver() {
 // ============================================================
 // 時刻コントロール
 // ============================================================
+// 早送りボタンの表示。アイコンとラベルを別要素にしているのでまとめて更新する
+// （スマホではラベルを隠してアイコンだけにするため）
+function setPlayButton(playing) {
+  const b = $('btnPlay');
+  b.querySelector('.btn-icon').textContent = playing ? '⏸' : '▶';
+  b.querySelector('.btn-label').textContent = playing ? '停止' : '早送り';
+  b.title = playing ? '停止' : '早送り';
+}
+
 function setLive(on) {
   state.live = on;
   if (on) {
@@ -1114,7 +1135,7 @@ function setLive(on) {
     $('timeSlider').value = 0;
   }
   $('btnLive').classList.toggle('is-on', on);
-  $('btnPlay').textContent = state.playing ? '⏸ 停止' : '▶ 再生';
+  setPlayButton(state.playing);
 }
 
 function setBase(ms) {
@@ -1123,7 +1144,7 @@ function setBase(ms) {
   state.baseMs = ms;
   state.offsetMin = 0;
   $('timeSlider').value = 0;
-  $('btnPlay').textContent = '▶ 再生';
+  setPlayButton(false);
   syncBaseInput(true);
   render();
 }
@@ -1143,7 +1164,7 @@ function bindControls() {
   $('btnPlay').addEventListener('click', () => {
     state.playing = !state.playing;
     if (state.playing) { state.live = false; $('btnLive').classList.remove('is-on'); }
-    $('btnPlay').textContent = state.playing ? '⏸ 停止' : '▶ 再生';
+    setPlayButton(state.playing);
   });
 
   $('speed').addEventListener('change', (e) => { state.speed = parseFloat(e.target.value); });

@@ -42,10 +42,13 @@
           <div id="clockLocal" class="clock-main">--:--:--</div>
         </div>
         <div class="time-actions">
-          <button id="btnLive" class="btn btn-live is-on">● LIVE</button>
-          <button id="btnPlay" class="btn">▶ 再生</button>
-          <select id="speed" class="sel" title="再生速度">
-            <option value="1">×1</option>
+          <button id="btnLive" class="btn btn-live is-on" title="実時間に追従">
+            <span class="btn-icon">●</span><span class="btn-label">LIVE</span>
+          </button>
+          <button id="btnPlay" class="btn" title="早送り">
+            <span class="btn-icon">▶</span><span class="btn-label">早送り</span>
+          </button>
+          <select id="speed" class="sel" title="早送りの速度">
             <option value="10">×10</option>
             <option value="60" selected>×60</option>
             <option value="300">×300</option>
@@ -91,7 +94,6 @@
         <div><dt>直下点</dt><dd id="sPlace">–</dd></div>
         <div><dt>日照</dt><dd id="sSun">–</dd></div>
       </dl>
-      <div id="obsRel" class="obs-rel"></div>
     </div>
 
     <div class="card">
@@ -132,7 +134,7 @@
           </label>
           <label class="chk"><input id="onlyVisible" type="checkbox" checked>肉眼で見えるものだけ</label>
         </div>
-        <button id="btnPredict" class="btn btn-primary">計算する</button>
+        <button id="btnPredict" class="btn btn-primary">🔍 探す</button>
       </div>
 
       <div id="passResult" class="pass-result"></div>

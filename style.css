@@ -152,6 +152,11 @@ body {
   letter-spacing: .02em;
 }
 .time-actions { display: flex; gap: 8px; align-items: center; }
+/* LIVE・早送り・倍率の高さを揃える */
+.time-actions .btn,
+.time-actions .sel { height: 32px; padding-top: 0; padding-bottom: 0; display: flex; align-items: center; }
+.time-actions .btn { gap: 5px; }
+.btn-icon { font-size: 11px; line-height: 1; }
 
 .slider-row {
   display: flex;
@@ -227,6 +232,7 @@ body {
   letter-spacing: .05em;
   font-size: 12px;
 }
+.btn-live .btn-icon { font-size: 9px; }
 .btn-live.is-on {
   color: #041018;
   background: var(--accent);
@@ -294,16 +300,6 @@ input[type="number"] { width: 100%; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.obs-rel {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--fg-dim);
-}
-.obs-rel:empty { display: none; }
-.obs-rel b { color: var(--fg); font-variant-numeric: tabular-nums; }
-
 .ref-check {
   margin-top: 10px;
   padding-top: 10px;
@@ -617,4 +613,18 @@ body.ar-open { overflow: hidden; }
   .time-more { display: none; }
   .time-more.open { display: flex; }
   .dt-label { margin-left: 0; }
+
+  /* LIVE・早送り・倍率は日時と同じ行の右側へ。幅を稼ぐため文字は出さない */
+  .time-head { flex-wrap: nowrap; gap: 8px; }
+  .time-actions { margin-left: auto; gap: 6px; }
+  .time-actions .btn-label { display: none; }
+  .time-actions .btn { padding: 0 10px; }
+  .time-actions .btn-icon { font-size: 13px; }
+  .btn-live .btn-icon { font-size: 11px; }
+
+  /* 時刻表示は主役ではないので、狭い画面では小さめにする */
+  .clock-main { font-size: 17px; }
+  .timebar { padding: 12px 14px; }
+  .slider-cap { font-size: 10px; }
+  .offset-label { font-size: 11px; }
 }
