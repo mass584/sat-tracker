@@ -55,6 +55,7 @@ node --check app.js && node --check clips.js && node --check ar.js
 | `sat-selected-v1` | 選択中の衛星のカタログ番号 |
 | `sat-observer-v1` | 観測地点 |
 | `sat-clips-v1` | 保存したタイミング |
+| `sat-calendar-v1` | 追加先のカレンダー（`google` / `apple`。未設定なら初回に選ばせる） |
 
 保存データの構造を変えるときはキーのバージョンを上げるか、**古い形を読めるフォールバックを
 必ず用意してください**（利用者のデータを黙って壊さないこと）。
@@ -76,6 +77,9 @@ node --check app.js && node --check clips.js && node --check ar.js
 
 `<dialog>` はブラウザの top layer に出るため、通常の `z-index` では上に描けません。
 ARビューを開く前に `clipsDialog.close()` が必要です。
+
+`showModal()` は開いている `<dialog>` に対して呼ぶと例外になります。カレンダーの予定から
+`#clip=...` で戻ってきたときは、すでに開いている場合があるので `dlg.open` を見てから呼びます。
 
 ### 端末姿勢（ar.js）
 

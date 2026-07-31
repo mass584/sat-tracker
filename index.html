@@ -150,7 +150,28 @@
   <label id="showPastRow" class="chk clips-past" hidden>
     <input id="showPastClips" type="checkbox">過去の記録も表示
   </label>
+  <p id="calPrefRow" class="cal-pref" hidden>
+    カレンダー: <b id="calPrefName">—</b>
+    <button id="calPrefChange" class="link-btn" type="button">変更</button>
+  </p>
   <form method="dialog"><button class="btn">閉じる</button></form>
+</dialog>
+
+<!-- ============ どのカレンダーを使うか（初回に一度だけ聞く） ============ -->
+<dialog id="calDialog" class="info-dialog cal-dialog">
+  <h2>どのカレンダーに追加しますか</h2>
+  <p class="note">最初の一回だけ選びます。あとから「保存したタイミング」の下で変更できます。</p>
+  <div class="cal-choices">
+    <button class="btn cal-choice" data-cal-pref="google" type="button">
+      <span class="cal-choice-name">Google カレンダー</span>
+      <span class="cal-choice-note">予定の作成画面が開きます</span>
+    </button>
+    <button class="btn cal-choice" data-cal-pref="apple" type="button">
+      <span class="cal-choice-name">Apple カレンダー</span>
+      <span class="cal-choice-note">iPhone・iPad・Mac の標準カレンダー</span>
+    </button>
+  </div>
+  <form method="dialog"><button class="btn">やめる</button></form>
 </dialog>
 
 <!-- ============ 技術情報ダイアログ ============ -->
