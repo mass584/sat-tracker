@@ -18,6 +18,7 @@ const TLE_CACHE_KEY = 'sat-tle-cache-v2';
 const TLE_CACHE_MS = 6 * 3600 * 1000;
 const OBS_KEY = 'sat-observer-v1';
 const SAT_KEY = 'sat-selected-v1';
+const GUIDE_SEEN_KEY = 'sat-guide-seen-v1';
 
 // よく知られた対象は日本語名と短縮ラベルを与え、選択肢の先頭に固定する
 // jp: 選択肢に出す説明つきの名前 / full: 画面各所に出す呼称（和名＋略称）
@@ -1212,6 +1213,12 @@ function bindControls() {
   $('satSelect').addEventListener('change', (e) => selectSat(e.target.value));
   $('btnInfo').addEventListener('click', () => { renderTleStatus(); $('infoDialog').showModal(); });
 
+  $('btnGuide').addEventListener('click', () => $('guideDialog').showModal());
+  // 閉じ方（ボタン／Esc）によらず「見た」ことにする
+  $('guideDialog').addEventListener('close', () => {
+    try { localStorage.setItem(GUIDE_SEEN_KEY, '1'); } catch (_) { /* ignore */ }
+  });
+
   $('btnLive').addEventListener('click', () => { setLive(!state.live); render(); });
 
   $('btnPlay').addEventListener('click', () => {
@@ -1464,6 +1471,10 @@ async function init() {
   renderTleStatus();
   initClips();       // clips.js / ar.js の関数はこの時点で読み込み済み
   initAr();
+
+  try {
+    if (!localStorage.getItem(GUIDE_SEEN_KEY)) $('guideDialog').showModal();
+  } catch (_) { /* ignore */ }
 
   try {
     const saved = JSON.parse(localStorage.getItem(OBS_KEY) || 'null');
