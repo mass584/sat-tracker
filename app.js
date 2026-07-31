@@ -928,7 +928,7 @@ function buildPass(obsGd, riseMs, setMs, catnr, magLimit) {
   };
 }
 
-const PASS_PAGE = 3;          // 初期表示件数、および「さらに表示」で増える件数
+const PASS_PAGE = 3;          // 初期表示件数。「さらに表示」を押したら残り全部を出す
 let passShown = PASS_PAGE;
 let lastArgs = null;          // 「さらに表示」で再描画するための元データ
 
@@ -998,7 +998,7 @@ function renderPasses(passes, obs, opts, keepCount) {
 
   if (rest > 0) {
     $('btnMorePasses').addEventListener('click', () => {
-      passShown += PASS_PAGE;
+      passShown = Infinity;                 // 一度押したら残りをすべて出す
       renderPasses(lastArgs.passes, lastArgs.obs, lastArgs.opts, true);
     });
   }

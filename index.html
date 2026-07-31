@@ -96,48 +96,50 @@
       </dl>
     </div>
 
-    <div class="card">
+    <div class="card card-search">
       <h2>次に見えるタイミングを探す</h2>
+      <div class="card-search-body">
 
-      <div class="obs-form">
-        <div class="field-row">
-          <button id="btnGeo" class="btn btn-sm">📍 現在地を使う</button>
-          <select id="preset" class="sel sel-sm">
-            <option value="">主要都市から選ぶ…</option>
-          </select>
-        </div>
-        <p class="obs-display">
-          <span id="obsCoords" class="obs-coords">観測地点が未設定です</span>
-        </p>
-        <div class="field-row">
-          <label class="tight">周囲の明るさ
-            <select id="skyLimit" class="sel sel-sm" title="肉眼で見える限界等級">
-              <option value="city">🏙 市街地</option>
-              <option value="suburb" selected>🌆 郊外</option>
-              <option value="dark">🌌 暗い空</option>
+        <div class="obs-form">
+          <div class="field-row">
+            <button id="btnGeo" class="btn btn-sm">📍 現在地を使う</button>
+            <select id="preset" class="sel sel-sm">
+              <option value="">主要都市から選ぶ…</option>
             </select>
-          </label>
-          <label class="tight">最低仰角
-            <select id="minEl" class="sel sel-sm">
-              <option value="5">5°</option>
-              <option value="10" selected>10°</option>
-              <option value="20">20°</option>
-              <option value="30">30°</option>
-            </select>
-          </label>
-          <label class="tight">検索期間
-            <select id="days" class="sel sel-sm">
-              <option value="3">3日</option>
-              <option value="7">7日</option>
-              <option value="14" selected>14日</option>
-            </select>
-          </label>
+          </div>
+          <p class="obs-display">
+            <span id="obsCoords" class="obs-coords">観測地点が未設定です</span>
+          </p>
+          <div class="field-row">
+            <label class="tight">周囲の明るさ
+              <select id="skyLimit" class="sel sel-sm" title="肉眼で見える限界等級">
+                <option value="city">🏙 市街地</option>
+                <option value="suburb" selected>🌆 郊外</option>
+                <option value="dark">🌌 暗い空</option>
+              </select>
+            </label>
+            <label class="tight">最低仰角
+              <select id="minEl" class="sel sel-sm">
+                <option value="5">5°</option>
+                <option value="10" selected>10°</option>
+                <option value="20">20°</option>
+                <option value="30">30°</option>
+              </select>
+            </label>
+            <label class="tight">検索期間
+              <select id="days" class="sel sel-sm">
+                <option value="3">3日</option>
+                <option value="7">7日</option>
+                <option value="14" selected>14日</option>
+              </select>
+            </label>
+          </div>
           <label class="chk"><input id="onlyVisible" type="checkbox" checked>肉眼で見えるものだけ</label>
+          <button id="btnPredict" class="btn btn-primary">🔍 探す</button>
         </div>
-        <button id="btnPredict" class="btn btn-primary">🔍 探す</button>
-      </div>
 
-      <div id="passResult" class="pass-result"></div>
+        <div id="passResult" class="pass-result"></div>
+      </div>
     </div>
 
   </aside>
