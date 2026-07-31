@@ -227,11 +227,8 @@ body {
 .btn:hover { background: #1d2a49; border-color: #35456d; }
 .btn-sm { padding: 4px 9px; font-size: 12px; }
 .btn-now { color: var(--accent); border-color: #2b5a72; }
-.btn-live {
-  color: var(--fg-dim);
-  letter-spacing: .05em;
-  font-size: 12px;
-}
+/* 早送りボタンと見た目を揃える（色・文字サイズは .btn のまま） */
+.btn-live { letter-spacing: .05em; }
 .btn-live .btn-icon { font-size: 12px; }
 .btn-live.is-on {
   color: #041018;
@@ -628,4 +625,35 @@ body.ar-open { overflow: hidden; }
   .timebar { padding: 12px 14px; }
   .slider-cap { font-size: 10px; }
   .offset-label { font-size: 11px; }
+}
+
+/* ---------- PC幅：画面内に収め、結果はカード内でスクロールさせる ---------- */
+@media (min-width: 1101px) {
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+
+  .layout {
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;          /* 2列とも高さいっぱいに伸ばす */
+  }
+  /* 地図側は高さが足りなければこの列だけスクロールする */
+  .map-pane { min-height: 0; overflow-y: auto; }
+  .side { min-height: 0; }
+
+  /* 「次に見えるタイミングを探す」を残りの高さいっぱいに。
+     見出しは固定したまま、条件と結果だけを内側でスクロールする */
+  .card-search {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .card-search > h2 { flex: 0 0 auto; }
+  .card-search-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;            /* スクロールバーとカードの縁が接しないように */
+  }
 }
