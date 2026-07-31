@@ -164,6 +164,9 @@ ar.js                 ARビュー（カメラ重ね表示 / 方位盤フォー�
 world-land.js         世界地図データ（Natural Earth 110m land）
 favicon.svg / .png    アイコン
 apple-touch-icon.png  iOSホーム画面用アイコン
+og-image.jpg          SNS共有時のプレビュー画像（OGP）
+robots.txt            検索エンジン向けクロール許可
+sitemap.xml           検索エンジン向けサイトマップ
 vendor/
   satellite.min.js    SGP4実装（satellite.js v5.0.0, MIT）
 ```

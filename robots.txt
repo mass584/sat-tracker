@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mass584.github.io/sat-tracker/sitemap.xml
