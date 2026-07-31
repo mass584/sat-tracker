@@ -410,11 +410,13 @@ input[type="number"] { width: 100%; }
 .pass-tag {
   display: inline-block;
   font-size: 10.5px;
-  padding: 1px 7px;
+  padding: 2px 8px;
   border-radius: 20px;
   border: 1px solid var(--line);
   color: var(--fg-dim);
 }
+/* 保存カードではタグが直前の行に接するので、上に余白を取る */
+.clip > .pass-tag { margin-top: 9px; }
 .pass-tag.vis { color: #ffdca8; border-color: #6b4d1f; background: #2a1f0c; }
 .pass-goto {
   margin-left: auto;
