@@ -13,7 +13,11 @@
 <body>
 
 <header class="topbar">
-  <h1>Sat Tracker <span class="sub">肉眼で見える人工衛星を探す</span></h1>
+  <h1>
+    <img class="logo" src="favicon.svg" alt="Sat Tracker" width="26" height="26">
+    <span class="brand">Sat Tracker</span>
+    <span class="sub">肉眼で見える人工衛星を探す</span>
+  </h1>
   <select id="satSelect" class="sel sat-select" title="追跡する衛星"></select>
   <div class="topbar-actions">
     <button id="btnClips" class="icon-btn" title="保存したタイミング" aria-label="保存したタイミング">☆</button>
@@ -29,6 +33,7 @@
       <canvas id="map"></canvas>
       <div id="mapHint" class="map-hint">クリックで観測地点を設定・ドラッグで横にスクロール</div>
       <button id="btnMapReset" class="map-reset" hidden>表示位置を戻す</button>
+      <button id="btnMapGeo" class="map-geo" title="現在地に観測地点を置く" aria-label="現在地に観測地点を置く">📍</button>
     </div>
 
     <div class="timebar">
@@ -56,7 +61,9 @@
       </div>
       <div id="offsetLabel" class="offset-label">基準時刻ちょうど</div>
 
-      <div class="jump-row">
+      <button id="btnTimeMore" class="time-more-toggle" aria-expanded="false">＋ 細かい時刻操作</button>
+
+      <div id="timeMore" class="jump-row time-more">
         <button class="btn btn-sm" data-jump="-1440">−1日</button>
         <button class="btn btn-sm" data-jump="-60">−1時間</button>
         <button class="btn btn-sm" data-jump="-10">−10分</button>
@@ -97,16 +104,15 @@
             <option value="">主要都市から選ぶ…</option>
           </select>
         </div>
-        <div class="obs-display">
+        <p class="obs-display">
           <span id="obsCoords" class="obs-coords">観測地点が未設定です</span>
-          <span class="obs-hint">地図をクリックしても設定できます</span>
-        </div>
+        </p>
         <div class="field-row">
-          <label class="tight">空の条件
+          <label class="tight">周囲の明るさ
             <select id="skyLimit" class="sel sel-sm" title="肉眼で見える限界等級">
-              <option value="city">市街地</option>
-              <option value="suburb" selected>郊外</option>
-              <option value="dark">暗い空</option>
+              <option value="city">🏙 市街地</option>
+              <option value="suburb" selected>🌆 郊外</option>
+              <option value="dark">🌌 暗い空</option>
             </select>
           </label>
           <label class="tight">最低仰角

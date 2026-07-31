@@ -201,6 +201,11 @@ function apparentMagnitude(catnr, st, obsGd, elDeg, rangeKm) {
 
 const fmtMag = (m) => `${m <= 0 ? '−' : ''}${Math.abs(m).toFixed(1)}等`;
 
+// 等級を 0〜1 の「濃さ」に変換する。−2等で1.0、5等で0.0
+const magStrength = (m) => (m === null || m === undefined) ? 0.55 : clamp((5 - m) / 7, 0, 1);
+// 濃さから、可視パスを示すオレンジ系の色を作る
+const magColor = (m, base) => `rgba(255, 180, 84, ${(base + (1 - base) * magStrength(m)).toFixed(3)})`;
+
 // ============================================================
 // 軌道要素（TLE）
 // ============================================================
@@ -444,7 +449,9 @@ function resizeCanvas() {
   W = cssW; H = cssH;
 }
 
-let panLon = 0;                       // 地図の横スクロール量（度）。経度は周期的なので剰余で扱う
+// 画面中央に来る経度は -panLon。既定は日本付近（東経140度）を中心にする
+const DEFAULT_PAN_LON = -140;
+let panLon = DEFAULT_PAN_LON;         // 地図の横スクロール量（度）。経度は周期的なので剰余で扱う
 const px = (lon) => (lon + 180 + panLon) / 360 * W;
 const py = (lat) => (90 - lat) / 180 * H;
 // 点で置くもの（マーカーやラベル）は画面内へ折り返す
@@ -599,8 +606,8 @@ function drawLabel(x, y, text, color, font, offX, offY) {
 }
 
 // 地図上の緯度経度に、背景から浮くようにラベルを置く
-function drawMapLabel(lat, lon, text, color, align) {
-  const x = pxw(normLonDeg(lon)), y = py(lat);
+function drawMapLabel(lat, lon, text, color, align, dy) {
+  const x = pxw(normLonDeg(lon)), y = py(lat) + (dy || 0);
   ctx.save();
   ctx.font = '600 10.5px -apple-system, sans-serif';
   ctx.shadowColor = 'rgba(4,8,20,.95)';
@@ -679,10 +686,11 @@ function drawMap(st) {
   drawFootprint(st.lat, st.lon, st.alt);
 
   // 凡例を置く代わりに、地図上の要素へ直接ラベルを添える
-  if (past.length) drawMapLabel(past[0].lat, past[0].lon, '過去の軌跡', 'rgba(140,175,220,.95)');
+  // 極軌道では軌跡の両端が近づくので、上下にずらして重ならないようにする
+  if (past.length) drawMapLabel(past[0].lat, past[0].lon, '過去の軌跡', 'rgba(140,175,220,.95)', null, 16);
   if (future.length) {
     const f = future[future.length - 1];
-    drawMapLabel(f.lat, f.lon, '未来の軌跡', 'rgba(77,208,255,.95)');
+    drawMapLabel(f.lat, f.lon, '未来の軌跡', 'rgba(77,208,255,.95)', null, -8);
   }
   const footEdge = Math.acos(EARTH_R / (EARTH_R + st.alt)) * R2D;
   drawMapLabel(clamp(st.lat - footEdge, -88, 88), st.lon, '可視円', 'rgba(77,208,255,.75)', 'center');
@@ -943,12 +951,16 @@ function renderPasses(passes, obs, opts, keepCount) {
     const to = p.visible ? p.visEnd : p.setMs;
     const eta = p.riseMs > now ? `約${fmtDuration(p.riseMs - now)}後` : '通過中';
     const visTag = p.visible
-      ? `<span class="pass-tag vis">肉眼可${p.mag !== null && p.mag !== undefined ? ' ' + fmtMag(p.mag) : ''}</span>`
+      ? `<span class="pass-tag vis" style="border-color:${magColor(p.mag, 0.3)};` +
+        `background:${magColor(p.mag, 0.08).replace('rgba(255, 180, 84', 'rgba(120, 78, 20')}">` +
+        `肉眼可${p.mag !== null && p.mag !== undefined ? ' ' + fmtMag(p.mag) : ''}</span>`
       : `<span class="pass-tag">${p.reason}</span>`;
-    return `<li class="pass ${p.visible ? 'vis' : ''} ${i === 0 ? 'next' : ''}">
+    // 明るいものほど左の縦線とタグを濃くする
+    const edge = p.visible ? ` style="border-left-color:${magColor(p.mag, 0.25)}"` : '';
+    return `<li class="pass ${p.visible ? 'vis' : ''} ${i === 0 ? 'next' : ''}" data-rise="${Math.round(p.riseMs)}"${edge}>
       <div class="pass-when">
         <span class="pass-date">${fmtDay(new Date(from))} ${fmtHM(new Date(from))}–${fmtHM(new Date(to))}</span>
-        <span class="pass-eta">${eta}</span>
+        <span class="pass-eta" data-pass-eta="${Math.round(p.riseMs)}">${eta}</span>
       </div>
       <div class="pass-meta">
         最大仰角 <b>${p.maxEl.toFixed(1)}°</b>（${compass(p.maxAz)}）<br>
@@ -980,7 +992,10 @@ function renderPasses(passes, obs, opts, keepCount) {
   }
 
   box.querySelectorAll('[data-goto]').forEach((btn) => {
-    btn.addEventListener('click', () => setBase(parseInt(btn.dataset.goto, 10)));
+    btn.addEventListener('click', () => {
+      setBase(parseInt(btn.dataset.goto, 10));
+      revealMap();
+    });
   });
   box.querySelectorAll('[data-clip]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -991,6 +1006,32 @@ function renderPasses(passes, obs, opts, keepCount) {
     });
   });
   syncClipButtons();
+}
+
+// 通過が迫ったカードを強調する。開いたままでも表示が古くならないよう毎秒見直す
+const SOON_MS = 60 * 60000;                 // 1時間前から「まもなく」扱い
+function updatePassEtas() {
+  const now = Date.now();
+  document.querySelectorAll('.pass[data-rise]').forEach((li) => {
+    const rise = parseInt(li.dataset.rise, 10);
+    const eta = li.querySelector('[data-pass-eta]');
+    if (eta) eta.textContent = rise > now ? `約${fmtDuration(rise - now)}後` : '通過中';
+    const soon = rise - now < SOON_MS;
+    li.classList.toggle('soon', soon);
+    if (eta) eta.classList.toggle('soon', soon);
+  });
+}
+
+// 地図が画面にほとんど入っていなければスクロールして見せる。
+// 幅の狭い端末では地図と計算結果が縦に並ぶため、時刻を移動しても変化が見えないことへの対策
+function revealMap() {
+  const el = document.querySelector('.map-wrap');
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const shown = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+  if (shown < Math.min(r.height, window.innerHeight) * 0.6) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 // 保存ボタンから参照するため、直近に描画したパスを保持する
@@ -1151,7 +1192,7 @@ function bindControls() {
     drag.moved += Math.abs(dx);
     panLon = (panLon + dx / r.width * 360) % 360;
     canvas.classList.add('dragging');
-    $('btnMapReset').hidden = Math.abs(panLon) < 0.5;
+    $('btnMapReset').hidden = Math.abs(panLon - DEFAULT_PAN_LON) < 0.5;
     render();
   });
 
@@ -1172,7 +1213,7 @@ function bindControls() {
   canvas.addEventListener('pointercancel', () => { drag = null; canvas.classList.remove('dragging'); });
 
   $('btnMapReset').addEventListener('click', () => {
-    panLon = 0;
+    panLon = DEFAULT_PAN_LON;
     $('btnMapReset').hidden = true;
     render();
   });
@@ -1190,24 +1231,36 @@ function bindControls() {
     e.target.value = '';
   });
 
-  $('btnGeo').addEventListener('click', () => {
+  const useCurrentLocation = (btn, label) => {
     if (!navigator.geolocation) {
-      $('passResult').innerHTML = '<p class="empty">このブラウザは位置情報に対応していません。緯度・経度を直接入力してください。</p>';
+      $('passResult').innerHTML = '<p class="empty">このブラウザは位置情報に対応していません。都市を選ぶか、地図をクリックして指定してください。</p>';
       return;
     }
-    $('btnGeo').textContent = '取得中…';
+    const original = btn.textContent;
+    btn.textContent = '…';
+    btn.disabled = true;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        $('btnGeo').textContent = '📍 現在地を使う';
+        btn.textContent = original;
+        btn.disabled = false;
         setObserver({ lat: pos.coords.latitude, lon: pos.coords.longitude, label: '現在地', kind: 'geo' });
       },
       (err) => {
-        $('btnGeo').textContent = '📍 現在地を使う';
+        btn.textContent = original;
+        btn.disabled = false;
         $('passResult').innerHTML = `<p class="empty">現在地を取得できませんでした（${err.message}）。` +
-          `位置情報は https もしくは localhost で開いた場合のみ利用できます。緯度・経度の直接入力や地図クリックでも指定できます。</p>`;
+          `位置情報は https もしくは localhost でのみ利用できます。都市の選択や地図クリックでも指定できます。</p>`;
       },
       { enableHighAccuracy: false, timeout: 10000 }
     );
+  };
+  $('btnGeo').addEventListener('click', (e) => useCurrentLocation(e.currentTarget));
+  $('btnMapGeo').addEventListener('click', (e) => useCurrentLocation(e.currentTarget));
+
+  $('btnTimeMore').addEventListener('click', (e) => {
+    const open = $('timeMore').classList.toggle('open');
+    e.currentTarget.setAttribute('aria-expanded', String(open));
+    e.currentTarget.textContent = open ? '− 細かい時刻操作' : '＋ 細かい時刻操作';
   });
 
   $('btnPredict').addEventListener('click', runPrediction);
@@ -1274,6 +1327,7 @@ async function init() {
 
   pollReference();
   setInterval(pollReference, 30000);
+  setInterval(updatePassEtas, 1000);
   setInterval(renderTleStatus, 60000);
   requestAnimationFrame(loop);
 }

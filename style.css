@@ -40,7 +40,11 @@ body {
   margin: 0;
   font-size: 17px;
   letter-spacing: .04em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.topbar .logo { display: none; border-radius: 6px; }
 .topbar .sub {
   font-size: 12px;
   font-weight: 400;
@@ -98,6 +102,22 @@ body {
 .map-reset[hidden] { display: none; }
 .map-reset:hover { background: #16203a; }
 
+.map-geo {
+  position: absolute;
+  right: 10px; bottom: 10px;
+  width: 40px; height: 40px;
+  display: none;                    /* スマホ幅でのみ出す */
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  border: 1px solid #2b5a72;
+  border-radius: 50%;
+  background: rgba(8, 11, 20, .88);
+  cursor: pointer;
+}
+.map-geo:active { background: #16203a; }
+
 .map-hint {
   position: absolute;
   left: 10px; bottom: 10px;
@@ -153,6 +173,21 @@ body {
   font-variant-numeric: tabular-nums;
   min-height: 18px;
 }
+
+.time-more-toggle {
+  display: none;                    /* スマホ幅でのみ出す */
+  width: 100%;
+  margin-top: 12px;
+  padding: 7px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg-dim);
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.time-more-toggle:hover { color: var(--fg); }
 
 .jump-row {
   display: flex;
@@ -219,6 +254,9 @@ body {
   font-family: inherit;
 }
 .sel-sm { font-size: 12px; padding: 4px 6px; }
+/* 同じ行に並ぶボタンとセレクトの高さを揃える */
+.field-row > .btn-sm,
+.field-row > .sel-sm { height: 28px; padding-top: 0; padding-bottom: 0; }
 input[type="number"] { width: 100%; }
 
 /* iOS Safari は 16px 未満の入力欄にフォーカスするとページ全体を勝手に拡大し、
@@ -302,17 +340,11 @@ input[type="number"] { width: 100%; }
 .field-row > label.tight { flex: 0 0 auto; }
 
 .obs-display {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 7px 10px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 7px;
+  margin: 2px 0 2px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
-.obs-coords { font-size: 13px; font-variant-numeric: tabular-nums; }
 .obs-coords.unset { color: var(--fg-dim); }
-.obs-hint { font-size: 10.5px; color: var(--fg-dim); }
 .chk {
   display: flex;
   align-items: center;
@@ -349,6 +381,12 @@ input[type="number"] { width: 100%; }
 }
 .pass.vis { border-left-color: var(--accent-2); }
 .pass.next { background: #12203a; }
+.pass.soon {
+  background: #1d2c1c;
+  border-color: #3d6b3a;
+  box-shadow: 0 0 0 1px rgba(92, 224, 138, .25);
+}
+.pass-eta.soon { color: var(--ok); font-weight: 700; }
 .pass-when {
   display: flex;
   justify-content: space-between;
@@ -550,3 +588,33 @@ body.ar-open { overflow: hidden; }
 .info-body dd .ok { color: var(--ok); }
 .info-body dd .err { color: var(--warn); }
 .info-dialog form { margin-top: 16px; text-align: right; }
+
+/* ---------- スマホ幅（1列レイアウト）向けの調整 ---------- */
+@media (max-width: 1100px) {
+  /* ヘッダーを画面上部に固定する */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+  .topbar .sub { display: none; }
+  /* 固定ヘッダーが高くならないよう1段に収める */
+  .topbar { flex-wrap: nowrap; }
+  /* スマホではアイコンだけにして、衛星の選択に幅を回す */
+  .topbar .logo { display: block; }
+  .topbar .brand { display: none; }
+  .sat-select { flex: 1; min-width: 0; max-width: none; }
+  .topbar-actions { margin-left: 0; }
+
+  /* 地図の操作説明は消し、代わりに現在地ピンを出す */
+  .map-hint { display: none; }
+  .map-geo { display: flex; }
+
+  /* 細かい時刻操作は既定で隠し、トグルで開く */
+  .time-more-toggle { display: block; }
+  .time-more { display: none; }
+  .time-more.open { display: flex; }
+  .dt-label { margin-left: 0; }
+}
