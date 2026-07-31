@@ -665,7 +665,7 @@ body.ar-open { overflow: hidden; }
 .info-dialog form { margin-top: 16px; text-align: right; }
 
 .guide-dialog { max-width: 640px; }
-.guide-img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.guide-img { display: block; width: 100%; height: auto; border-radius: 6px; margin-top: 8px }
 
 /* ---------- スマホ幅（1列レイアウト）向けの調整 ---------- */
 @media (max-width: 1100px) {
