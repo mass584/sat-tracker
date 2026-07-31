@@ -6,11 +6,15 @@
  */
 
 const CLIP_KEY = 'sat-clips-v1';
+// どのカレンダーに追加するか（'google' | 'apple'）。初回に一度だけ聞いて覚える
+const CAL_PREF_KEY = 'sat-calendar-v1';
 
 // 終わった直後に消えると使いにくいので、この時間は「これから」の扱いのままにする
 const PAST_BUFFER_MS = 30 * 60000;
 // 過去ぶんを保持する期間（これを過ぎたら自動で捨てる）
 const CLIP_RETENTION_MS = 7 * 86400000;
+// カレンダーに入れる通知の前倒し時間（空の下へ出る支度がいるので少し早めに鳴らす）
+const CAL_ALARM_MIN = 10;
 
 let clips = [];
 let showPastClips = false;      // 常にOFFで開く（保存はしない）
@@ -75,12 +79,218 @@ function clipStartMs(c) { return c.visible && c.visStart ? c.visStart : c.riseMs
 function clipEndMs(c) { return c.visible && c.visEnd ? c.visEnd : c.setMs; }
 
 // ============================================================
+// カレンダーへの追加
+// ============================================================
+/*
+ * 使うカレンダーは初回に一度だけ選んでもらい、localStorage に覚える。
+ *   Google … 予定の作成画面を開く
+ *   Apple  … .ics を開く → 「カレンダーに追加」の画面が出る
+ * 端末から推測しない（Macで普段Googleカレンダーを使う、のような組み合わせが普通にあるため）。
+ *
+ * 予定に観測地点（地名・座標）は入れない。Googleカレンダー側は予定の中身が
+ * 外部へ渡るため、居場所を出さない方針（AGENTS.md）に合わせて両方から外している。
+ */
+
+// カレンダーからアプリへ戻れるようにURLを添える。
+// file:// で開いているときは他の端末から辿れないので付けない
+function appUrl() {
+  return /^https?:$/.test(location.protocol) ? location.origin + location.pathname : '';
+}
+
+// 予定から辿ったときに、その記録を開いた状態で見せるためのリンク
+const CLIP_HASH = '#clip=';
+function clipPermalink(c) {
+  const base = appUrl();
+  return base ? `${base}${CLIP_HASH}${encodeURIComponent(c.id)}` : '';
+}
+
+/*
+ * #clip=... 付きで開かれたら、保存ダイアログをその記録までスクロールした状態で出す。
+ * 記録は localStorage にしかないので、保存した端末以外で開くと見つからない。
+ * そのときは通常の画面のまま出す（エラーを出しても利用者にできることがない）。
+ */
+function openClipFromHash() {
+  if (!location.hash.startsWith(CLIP_HASH)) return;
+  const id = decodeURIComponent(location.hash.slice(CLIP_HASH.length));
+  const c = clips.find((x) => x.id === id);
+  if (!c) return;
+
+  showPastClips = isPastClip(c);      // 終わった記録は既定で隠れているので出す
+  renderClips();
+  const dlg = $('clipsDialog');
+  if (!dlg.open) dlg.showModal();     // 開いたまま踏まれることがある（showModalの二重呼びは例外）
+
+  const li = $('clipList').querySelector(`[data-clip-id="${id}"]`);
+  if (!li) return;
+  li.scrollIntoView({ block: 'center' });
+  li.classList.add('clip-focus');     // どれのことか分かるように一度だけ光らせる
+}
+
+const CAL_NAMES = { google: 'Google カレンダー', apple: 'Apple カレンダー' };
+
+function calPref() {
+  const v = (() => { try { return localStorage.getItem(CAL_PREF_KEY); } catch (_) { return null; } })();
+  return CAL_NAMES[v] ? v : null;         // 未選択・壊れた値は「未設定」に倒す
+}
+
+function setCalPref(v) {
+  try { localStorage.setItem(CAL_PREF_KEY, v); } catch (_) { /* ignore */ }
+  renderCalPref();
+}
+
+// 選択済みのときだけ、保存ダイアログの下に現在の設定と変更手段を出す
+function renderCalPref() {
+  const row = $('calPrefRow');
+  const v = calPref();
+  row.hidden = !v;
+  if (v) $('calPrefName').textContent = CAL_NAMES[v];
+}
+
+// iPadOSはUAがMacを名乗るのでタッチの有無も見る。
+// Apple を選んだあと、iOSかどうかで .ics の渡し方だけ変える
+function isIosDevice() {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+         (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+
+// 予定の表題と本文は、どちらのカレンダーでも同じ内容にする
+function calTitle(c) {
+  const name = satNameByCatnr(c.catnr, c.sat);
+  return c.visible
+    ? `🛰 ${name} が見える（${compass(c.maxAz)}の空・最大仰角${c.maxEl.toFixed(0)}°）`
+    : `🛰 ${name} が通過（肉眼では見えない条件）`;
+}
+
+function calDetails(c) {
+  const start = clipStartMs(c), end = clipEndMs(c);
+  const lines = [
+    `${fmtHM(new Date(start))}–${fmtHM(new Date(end))} に ${compass(c.riseAz)} から ${compass(c.setAz)} へ動きます。`,
+    '',
+    `最大仰角: ${c.maxEl.toFixed(0)}°（${compass(c.maxAz)}）`,
+    c.visible
+      ? `明るさ: ${c.mag !== null && c.mag !== undefined ? fmtMag(c.mag) : '肉眼で見える見込み'}`
+      : '肉眼では見えない条件です（方角と時刻の目安として）',
+  ];
+  const url = clipPermalink(c);
+  if (url) lines.push('', 'アプリで見る（ARで方向を追えます）:', url);
+  return lines.join('\n');
+}
+
+// iCalendar の日時表記（UTC）: 20260731T101500Z
+function icsUtc(ms) {
+  return new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
+
+// 値の中の記号は仕様上そのままでは置けない（改行は \n の2文字で表す）
+function icsEscape(s) {
+  return String(s).replace(/([\\;,])/g, '\\$1').replace(/\n/g, '\\n');
+}
+
+// 1行75オクテットまで。折り返しは行頭に空白を置いて続ける。
+// 日本語は1文字3オクテットなので、文字数ではなくバイト数で数える
+function icsFold(line) {
+  const enc = new TextEncoder();
+  let out = '', len = 0;
+  for (const ch of line) {
+    const n = enc.encode(ch).length;
+    if (len + n > 73) { out += '\r\n '; len = 1; }   // 継続行の先頭空白ぶんを1で数える
+    out += ch;
+    len += n;
+  }
+  return out;
+}
+
+function buildIcs(c) {
+  const name = satNameByCatnr(c.catnr, c.sat);
+  const url = clipPermalink(c);
+  const rows = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Sat Tracker//JA',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${c.id.replace('@', '-')}@sat-tracker.local`,
+    `DTSTAMP:${icsUtc(Date.now())}`,
+    `DTSTART:${icsUtc(clipStartMs(c))}`,
+    `DTEND:${icsUtc(clipEndMs(c))}`,
+    `SUMMARY:${icsEscape(calTitle(c))}`,
+    `DESCRIPTION:${icsEscape(calDetails(c))}`,
+    ...(url ? [`URL:${url}`] : []),
+    'BEGIN:VALARM',
+    'ACTION:DISPLAY',
+    `TRIGGER:-PT${CAL_ALARM_MIN}M`,
+    `DESCRIPTION:${icsEscape(`まもなく ${name} が通ります`)}`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ];
+  return rows.map(icsFold).join('\r\n') + '\r\n';
+}
+
+// Googleカレンダーの予定作成画面。開いた先で「保存」を押すだけで入る
+function googleCalendarUrl(c) {
+  const q = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: calTitle(c),
+    dates: `${icsUtc(clipStartMs(c))}/${icsUtc(clipEndMs(c))}`,
+    details: calDetails(c),
+  });
+  return `https://calendar.google.com/calendar/render?${q}`;
+}
+
+// 未選択なら先に聞く。選んだらそのまま続きを実行する
+function addToCalendar(c) {
+  const pref = calPref();
+  if (!pref) { askCalPref(c); return; }
+  if (pref === 'google') { window.open(googleCalendarUrl(c), '_blank', 'noopener'); return; }
+  openIcs(c);
+}
+
+// 選択ダイアログ。clip を渡すと、選んだあとその予定の追加まで続ける
+function askCalPref(c) {
+  const dlg = $('calDialog');
+  dlg.querySelectorAll('[data-cal-pref]').forEach((b) => {
+    b.onclick = () => {
+      setCalPref(b.dataset.calPref);
+      dlg.close();
+      if (c) addToCalendar(c);
+    };
+  });
+  dlg.showModal();
+}
+
+function openIcs(c) {
+  // .ics を開くとカレンダーが受け取る。
+  // iOSはダウンロード指定にするとファイルアプリ経由になってしまうので、
+  // そのまま開かせて「カレンダーに追加」の画面を出す
+  const blob = new Blob([buildIcs(c)], { type: 'text/calendar;charset=utf-8' });
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = href;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  if (!isIosDevice()) {
+    const d = new Date(clipStartMs(c));
+    const p = (n) => String(n).padStart(2, '0');
+    a.download = `sat-${c.catnr}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}` +
+                 `-${p(d.getHours())}${p(d.getMinutes())}.ics`;
+  }
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // 読み込みが終わる前に解放するとiOSでファイルが空になるので少し待つ
+  setTimeout(() => URL.revokeObjectURL(href), 10000);
+}
+
+// ============================================================
 // 表示
 // ============================================================
 function renderClips() {
   const box = $('clipList');
   purgeClips();
   renderClipBadge();
+  renderCalPref();
 
   const upcoming = clips.filter((c) => !isPastClip(c)).sort((a, b) => clipStartMs(a) - clipStartMs(b));
   const past = clips.filter(isPastClip).sort((a, b) => clipStartMs(b) - clipStartMs(a));
@@ -114,7 +324,7 @@ function renderClips() {
     const tag = c.visible
       ? `<span class="pass-tag vis" style="${ms.tag}">${c.mag !== null && c.mag !== undefined ? fmtMag(c.mag) : '肉眼可'}</span>`
       : '<span class="pass-tag">肉眼では見えない条件</span>';
-    return `<li class="clip ${c.visible ? 'vis' : ''} ${done ? 'done' : ''}"${c.visible ? ` style="${ms.card}"` : ''}>
+    return `<li class="clip ${c.visible ? 'vis' : ''} ${done ? 'done' : ''}" data-clip-id="${c.id}"${c.visible ? ` style="${ms.card}"` : ''}>
       <div class="clip-head">
         <span class="clip-sat">${satNameByCatnr(c.catnr, c.sat)}</span>
         <span class="clip-eta" data-eta="${Math.round(start)}">–</span>
@@ -126,7 +336,8 @@ function renderClips() {
       </div>
       ${tag}
       <div class="clip-actions">
-        ${done ? '' : `<button class="btn btn-sm btn-ar" data-ar="${c.id}">📷 ARで探す</button>`}
+        ${done ? '' : `<button class="btn btn-sm btn-ar" data-ar="${c.id}">📷 ARで探す</button>
+        <button class="btn btn-sm btn-cal" data-cal="${c.id}">📅 カレンダーに追加</button>`}
         <button class="btn btn-sm btn-del" data-del="${c.id}">削除</button>
       </div>
     </li>`;
@@ -153,6 +364,11 @@ function renderClips() {
       if (!c) return;
       $('clipsDialog').close();      // モーダルはARビューより手前に出るため閉じる
       openAr(c);
+    }));
+  box.querySelectorAll('[data-cal]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const c = clips.find((x) => x.id === b.dataset.cal);
+      if (c) addToCalendar(c);
     }));
 
   updateClipEtas();
@@ -209,6 +425,9 @@ function initClips() {
     renderClips();
   });
 
+  // 追加先の変更。clip を渡さないので、選んでも予定の追加までは進まない
+  $('calPrefChange').addEventListener('click', () => askCalPref(null));
+
   // 旧バージョンが通知用に登録した Service Worker が残っていれば掃除する
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.getRegistrations()
@@ -217,4 +436,8 @@ function initClips() {
   }
 
   setInterval(updateClipEtas, 1000);
+
+  openClipFromHash();      // カレンダーの予定から辿ってきた場合
+  // アプリを開いたままリンクを踏むとページは読み直されないので、ハッシュだけでも拾う
+  window.addEventListener('hashchange', openClipFromHash);
 }
