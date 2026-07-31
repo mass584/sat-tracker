@@ -1059,6 +1059,13 @@ function syncClipButtons() {
   });
 }
 
+// 検索条件（観測地点・周囲の明るさ・最低仰角・検索期間・肉眼判定）が変わったら、
+// 既に出ている結果はその条件と食い違うので消す（次の「探す」で計算し直す）
+function resetPassResult() {
+  state.passes = null;
+  $('passResult').innerHTML = '';
+}
+
 function runPrediction() {
   if (!state.observer) {
     $('passResult').innerHTML = '<p class="empty">観測地点が未設定です。「現在地を使う」か主要都市の選択、' +
@@ -1103,6 +1110,7 @@ function setObserver(obs) {
   state.observer = obs;
   renderObserver();
   try { localStorage.setItem(OBS_KEY, JSON.stringify(obs)); } catch (_) { /* ignore */ }
+  resetPassResult();
   render();
 }
 
@@ -1249,7 +1257,6 @@ function bindControls() {
     if (e.target.value === '') return;
     const [name, lat, lon] = PRESETS[parseInt(e.target.value, 10)];
     setObserver({ lat, lon, label: name, kind: 'preset' });
-    e.target.value = '';
   });
 
   const useCurrentLocation = (btn, label) => {
@@ -1285,6 +1292,8 @@ function bindControls() {
   });
 
   $('btnPredict').addEventListener('click', runPrediction);
+  ['skyLimit', 'minEl', 'days'].forEach((id) => $(id).addEventListener('change', resetPassResult));
+  $('onlyVisible').addEventListener('change', resetPassResult);
 
   window.addEventListener('resize', () => { resizeCanvas(); render(); });
 }

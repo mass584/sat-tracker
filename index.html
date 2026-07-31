@@ -45,15 +45,17 @@
           <button id="btnLive" class="btn btn-live is-on" title="実時間に追従">
             <span class="btn-icon">▶️</span><span class="btn-label">LIVE</span>
           </button>
-          <button id="btnPlay" class="btn" title="早送り">
-            <span class="btn-icon">⏩</span><span class="btn-label">早送り</span>
-          </button>
-          <select id="speed" class="sel" title="早送りの速度">
-            <option value="10">×10</option>
-            <option value="60" selected>×60</option>
-            <option value="300">×300</option>
-            <option value="1800">×1.8k</option>
-          </select>
+          <div class="speed-group">
+            <button id="btnPlay" class="btn" title="早送り">
+              <span class="btn-icon">⏩</span><span class="btn-label">早送り</span>
+            </button>
+            <select id="speed" class="sel" title="早送りの速度">
+              <option value="10">×10</option>
+              <option value="60" selected>×60</option>
+              <option value="300">×300</option>
+              <option value="1800">×1.8k</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -128,9 +130,9 @@
             </label>
             <label class="tight">検索期間
               <select id="days" class="sel sel-sm">
-                <option value="3">3日</option>
-                <option value="7">7日</option>
-                <option value="14" selected>14日</option>
+                <option value="3">3日先まで</option>
+                <option value="7">1週間先まで</option>
+                <option value="14" selected>2週間先まで</option>
               </select>
             </label>
           </div>

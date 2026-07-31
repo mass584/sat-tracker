@@ -158,6 +158,11 @@ body {
 .time-actions .btn { gap: 5px; }
 .btn-icon { font-size: 12px; line-height: 1; }
 
+/* 早送りボタンと倍率セレクトは隙間なくくっつけて1つの部品に見せる */
+.speed-group { display: flex; }
+.speed-group .btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.speed-group .sel { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: none; }
+
 .slider-row {
   display: flex;
   align-items: center;
@@ -660,6 +665,11 @@ body.ar-open { overflow: hidden; }
   .timebar { padding: 12px 14px; }
   .slider-cap { font-size: 10px; }
   .offset-label { font-size: 11px; }
+
+  /* 倍率の文字はボタン類より少し小さく見せる。実フォントサイズを16px未満にすると
+     iOSでフォーカス時にズームしたままになる（.sel-smの注記と同じ理由）ため、
+     見た目だけscaleで縮める */
+  #speed { transform: scale(0.85); transform-origin: left center; }
 
   /* この時刻の値はラベルと値を横並びにして省スペースにする */
   .stats > div { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
