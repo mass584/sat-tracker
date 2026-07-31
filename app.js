@@ -1110,6 +1110,8 @@ function setObserver(obs) {
   state.observer = obs;
   renderObserver();
   try { localStorage.setItem(OBS_KEY, JSON.stringify(obs)); } catch (_) { /* ignore */ }
+  // 都市プリセット以外（現在地・地図クリック）で上書きされたら、選択済みの都市名表示を戻す
+  if (obs.kind !== 'preset') $('preset').value = '';
   resetPassResult();
   render();
 }
