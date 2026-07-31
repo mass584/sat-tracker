@@ -1042,7 +1042,7 @@ function revealMap() {
   const r = el.getBoundingClientRect();
   const shown = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
   if (shown < Math.min(r.height, window.innerHeight) * 0.6) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }
 
@@ -1057,6 +1057,13 @@ function syncClipButtons() {
     btn.textContent = saved ? '★ 保存済み' : '☆ 保存';
     btn.classList.toggle('saved', saved);
   });
+}
+
+// 検索条件（観測地点・周囲の明るさ・最低仰角・検索期間・肉眼判定）が変わったら、
+// 既に出ている結果はその条件と食い違うので消す（次の「探す」で計算し直す）
+function resetPassResult() {
+  state.passes = null;
+  $('passResult').innerHTML = '';
 }
 
 function runPrediction() {
@@ -1103,6 +1110,9 @@ function setObserver(obs) {
   state.observer = obs;
   renderObserver();
   try { localStorage.setItem(OBS_KEY, JSON.stringify(obs)); } catch (_) { /* ignore */ }
+  // 都市プリセット以外（現在地・地図クリック）で上書きされたら、選択済みの都市名表示を戻す
+  if (obs.kind !== 'preset') $('preset').value = '';
+  resetPassResult();
   render();
 }
 
@@ -1249,7 +1259,6 @@ function bindControls() {
     if (e.target.value === '') return;
     const [name, lat, lon] = PRESETS[parseInt(e.target.value, 10)];
     setObserver({ lat, lon, label: name, kind: 'preset' });
-    e.target.value = '';
   });
 
   const useCurrentLocation = (btn, label) => {
@@ -1285,6 +1294,8 @@ function bindControls() {
   });
 
   $('btnPredict').addEventListener('click', runPrediction);
+  ['skyLimit', 'minEl', 'days'].forEach((id) => $(id).addEventListener('change', resetPassResult));
+  $('onlyVisible').addEventListener('change', resetPassResult);
 
   window.addEventListener('resize', () => { resizeCanvas(); render(); });
 }
