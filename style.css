@@ -44,7 +44,9 @@ body {
   align-items: center;
   gap: 8px;
 }
-.topbar .logo { display: block; border-radius: 6px; }
+/* SVG自体の絵柄（地球・軌道）が下寄りなので、テキストと並べたときの
+   見た目の重心を合わせるため少し上へ寄せる */
+.topbar .logo { display: block; border-radius: 6px; transform: translateY(-2px); }
 .topbar .sub {
   font-size: 12px;
   font-weight: 400;
@@ -101,6 +103,30 @@ body {
 }
 .map-reset[hidden] { display: none; }
 .map-reset:hover { background: #16203a; }
+
+.map-zoom {
+  position: absolute;
+  right: 10px; bottom: 60px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #2b5a72;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(8, 11, 20, .88);
+}
+.map-zoom-btn {
+  width: 32px; height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 17px/1 -apple-system, sans-serif;
+  color: var(--fg);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.map-zoom-btn:active { background: #16203a; }
+.map-zoom-btn + .map-zoom-btn { border-top: 1px solid #2b5a72; }
 
 .map-geo {
   position: absolute;
@@ -700,7 +726,7 @@ body.ar-open { overflow: hidden; }
   .map-pane { min-height: 0; overflow-y: auto; }
   .side { min-height: 0; }
 
-  /* 「次に見えるタイミングを探す」を残りの高さいっぱいに。
+  /* 「次の観測チャンスを探す」を残りの高さいっぱいに。
      見出しは固定したまま、条件と結果だけを内側でスクロールする */
   .card-search {
     flex: 1;
@@ -715,4 +741,17 @@ body.ar-open { overflow: hidden; }
     overflow-y: auto;
     padding-right: 4px;            /* スクロールバーとカードの縁が接しないように */
   }
+
+  /* OS標準の太いスクロールバーは主張が強いので、細い見た目にする */
+  .map-pane, .card-search-body {
+    scrollbar-width: thin;
+    scrollbar-color: #35456d transparent;
+  }
+  .map-pane::-webkit-scrollbar, .card-search-body::-webkit-scrollbar { width: 8px; }
+  .map-pane::-webkit-scrollbar-track, .card-search-body::-webkit-scrollbar-track { background: transparent; }
+  .map-pane::-webkit-scrollbar-thumb, .card-search-body::-webkit-scrollbar-thumb {
+    background: #35456d;
+    border-radius: 4px;
+  }
+  .map-pane::-webkit-scrollbar-thumb:hover, .card-search-body::-webkit-scrollbar-thumb:hover { background: #4a5f8f; }
 }
