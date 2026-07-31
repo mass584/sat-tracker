@@ -64,7 +64,17 @@ function addClip(p, ctx) {
   clips.sort((a, b) => a.riseMs - b.riseMs);
   saveClips();
   renderClips();
+  pingClipsIcon();
   return true;
+}
+
+// 保存直後にヘッダーの★を光らせて、保存先がここであることに気付いてもらう
+function pingClipsIcon() {
+  const btn = $('btnClips');
+  btn.classList.remove('ping');
+  void btn.offsetWidth;               // アニメーションを連続保存でも毎回リスタートさせる
+  btn.classList.add('ping');
+  btn.addEventListener('animationend', () => btn.classList.remove('ping'), { once: true });
 }
 
 function removeClip(id) {

@@ -1042,7 +1042,7 @@ function revealMap() {
   const r = el.getBoundingClientRect();
   const shown = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
   if (shown < Math.min(r.height, window.innerHeight) * 0.6) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }
 

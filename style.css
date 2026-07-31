@@ -44,7 +44,7 @@ body {
   align-items: center;
   gap: 8px;
 }
-.topbar .logo { display: none; border-radius: 6px; }
+.topbar .logo { display: block; border-radius: 6px; }
 .topbar .sub {
   font-size: 12px;
   font-weight: 400;
@@ -106,7 +106,7 @@ body {
   position: absolute;
   right: 10px; bottom: 10px;
   width: 40px; height: 40px;
-  display: none;                    /* スマホ幅でのみ出す */
+  display: flex;
   align-items: center;
   justify-content: center;
   font-size: 18px;
@@ -159,7 +159,7 @@ body {
 .btn-icon { font-size: 12px; line-height: 1; }
 
 /* 早送りボタンと倍率セレクトは隙間なくくっつけて1つの部品に見せる */
-.speed-group { display: flex; }
+.speed-group { display: flex; align-items: center; }
 .speed-group .btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .speed-group .sel { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: none; }
 
@@ -598,6 +598,14 @@ body.ar-open { overflow: hidden; }
   font: 700 9px/14px -apple-system, sans-serif;
 }
 
+/* 保存直後、ここから見られることに気付いてもらうためヘッダーの星を1回だけ光らせる */
+#btnClips.ping { animation: clip-icon-ping .7s ease-out; }
+@keyframes clip-icon-ping {
+  0% { box-shadow: 0 0 0 0 rgba(255, 180, 84, .6); }
+  40% { transform: scale(1.3); box-shadow: 0 0 0 8px rgba(255, 180, 84, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 8px rgba(255, 180, 84, 0); }
+}
+
 .info-dialog {
   max-height: 80vh;
   overflow-y: auto;
@@ -640,14 +648,12 @@ body.ar-open { overflow: hidden; }
   /* 固定ヘッダーが高くならないよう1段に収める */
   .topbar { flex-wrap: nowrap; }
   /* スマホではアイコンだけにして、衛星の選択に幅を回す */
-  .topbar .logo { display: block; }
   .topbar .brand { display: none; }
   .sat-select { flex: 1; min-width: 0; max-width: none; }
   .topbar-actions { margin-left: 0; }
 
   /* 地図の操作説明は消し、代わりに現在地ピンを出す */
   .map-hint { display: none; }
-  .map-geo { display: flex; }
 
   /* 細かい時刻操作は縦幅がもったいないので出さない（スマホでは無くてOK） */
   .time-more-toggle { display: none; }
@@ -668,8 +674,13 @@ body.ar-open { overflow: hidden; }
 
   /* 倍率の文字はボタン類より少し小さく見せる。実フォントサイズを16px未満にすると
      iOSでフォーカス時にズームしたままになる（.sel-smの注記と同じ理由）ため、
-     見た目だけscaleで縮める */
-  #speed { transform: scale(0.85); transform-origin: left center; }
+     見た目だけscaleで縮める。scaleは高さも縮めてしまうので、早送りボタンと
+     高さが揃うよう縮小分だけ先に枠を大きくしておく */
+  #speed {
+    height: calc(32px / 0.85);
+    transform: scale(0.85);
+    transform-origin: left center;
+  }
 
   /* この時刻の値はラベルと値を横並びにして省スペースにする */
   .stats > div { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
