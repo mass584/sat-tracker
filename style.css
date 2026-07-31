@@ -29,7 +29,7 @@ body {
 /* ---------- ヘッダ ---------- */
 .topbar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 16px;
   flex-wrap: wrap;
   padding: 12px 20px;
